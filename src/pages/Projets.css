@@ -1,0 +1,161 @@
+.projets-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #1e293b;
+}
+
+/* Formulaire d'ajout */
+.form-card {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 30px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-grid-full {
+  grid-column: span 2;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.btn-add {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  grid-column: span 2;
+}
+
+.btn-add:hover {
+  background-color: #1d4ed8;
+}
+
+/* Cartes des projets */
+.projets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.projet-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.projet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.projet-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.projet-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.projet-responsable {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+/* Badges de Statut */
+.badge-statut {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-en-cours {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+.badge-termine {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.badge-en-attente {
+  background-color: #f1f5f9;
+  color: #64748b;
+}
+
+/* Zone d'action */
+.actions-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.select-statut {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.btn-delete {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-delete:hover {
+  background-color: #fee2e2;
+}
