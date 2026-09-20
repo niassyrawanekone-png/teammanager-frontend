@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import React, { useState, useEffect } from "react";
 import {
   getUtilisateurs,
@@ -12,6 +13,7 @@ export default function Membres() {
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("Membre");
+  const [recherche, setRecherche] = useState("");
   const [erreur, setErreur] = useState("");
 
   const chargerMembres = async () => {
@@ -60,6 +62,12 @@ export default function Membres() {
     }
   };
 
+  // Filtrage dynamique des membres
+  const membresFiltres = membres.filter((m) =>
+    m.nom.toLowerCase().includes(recherche.toLowerCase()) ||
+    (m.email && m.email.toLowerCase().includes(recherche.toLowerCase()))
+  );
+
   return (
     <div className="equipe-container">
       <h2 className="title">Gestion des Membres</h2>
@@ -92,36 +100,72 @@ export default function Membres() {
         </form>
       </div>
 
-      {/* Liste des cartes membres */}
-      <div className="members-grid">
-        {membres.map((m) => (
-          <div key={m.id} className="member-card">
-            <div>
-              <div className="member-header">
-                <span className="member-name">{m.nom}</span>
-                <span className={`badge ${m.role === "Admin" ? "badge-admin" : "badge-membre"}`}>
-                  {m.role}
-                </span>
-              </div>
-              <div className="member-email">{m.email || "Aucun email renseigné"}</div>
-            </div>
+      {/* Barre de recherche */}
+      <div style={{ marginBottom: "20px" }}>
+        <input
+          className="form-input"
+          type="text"
+          placeholder="🔍 Rechercher un membre par nom ou email..."
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          style={{ width: "100%" }}
+        />
+      </div>
 
-            <div className="actions-row">
-              <button
-                className="btn-action btn-promote"
-                onClick={() => handlePromouvoir(m.id, m.role)}
-              >
-                {m.role === "Admin" ? "Rétrograder" : "Promouvoir"}
-              </button>
-              <button
-                className="btn-action btn-delete"
-                onClick={() => handleSupprimer(m.id)}
-              >
-                Supprimer
-              </button>
+      {/* Liste filtrée des cartes membres */}
+      <div className="members-grid">
+        {membresFiltres.length === 0 ? (
+          <p style={{ color: "#64748b" }}>Aucun membre trouvé.</p>
+        ) : (
+          membresFiltres.map((m) => (
+            <div key={m.id} className="member-card">
+              <div>
+                <div className="member-header">
+                  <span className="member-name">{m.nom}</span>
+                  <span className={`badge ${m.role === "Admin" ? "badge-admin" : "badge-membre"}`}>
+                    {m.role}
+                  </span>
+                </div>
+                <div className="member-email">{m.email || "Aucun email renseigné"}</div>
+              </div>
+
+              <div className="actions-row">
+                <Link
+                  to={`/equipe/${m.id}`}
+                  className="btn-action"
+                  style={{
+                    backgroundColor: "#f1f5f9",
+                    color: "#334155",
+                    textDecoration: "none",
+                    textAlign: "center",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    fontSize: "0.875rem",
+                    fontWeight: "500",
+                  }}
+                >
+                  Voir profil
+                </Link>
+            
+              </div>
+
+              <div className="actions-row">
+                <button
+                  className="btn-action btn-promote"
+                  onClick={() => handlePromouvoir(m.id, m.role)}
+                >
+                  {m.role === "Admin" ? "Rétrograder" : "Promouvoir"}
+                </button>
+                <button
+                  className="btn-action btn-delete"
+                  onClick={() => handleSupprimer(m.id)}
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
