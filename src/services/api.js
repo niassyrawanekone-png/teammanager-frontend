@@ -49,6 +49,33 @@ export const inscrireUtilisateur = (donnees) =>
     body: JSON.stringify(donnees),
   });
 
+export const seConnecter = async (email, password) => {
+  const formData = new URLSearchParams();
+  formData.append("username", email);
+  formData.append("password", password);
+
+  const response = await fetch(`${BASE_URL}/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMessage = "Identifiants incorrects.";
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.detail || errorMessage;
+    } catch (_) {}
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  sessionStorage.setItem("token", data.access_token);
+  return data;
+};
+
 /* ================= PROFIL CONNECTÉ ================= */
 
 export const getMonProfil = () => request("/me");
