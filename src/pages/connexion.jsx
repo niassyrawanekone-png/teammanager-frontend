@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {
+  seConnecter as seConnecterAPI,
+  inscrireUtilisateur,
+} from "../services/api";
 
 function Connexion() {
   const [estInscription, setEstInscription] = useState(false);
@@ -15,50 +19,47 @@ function Connexion() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Route de destination après connexion (par défaut /equipe)
+  // Route de destination après connexion
   const destination = location.state?.from?.pathname || "/equipe";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setErreur("");
     setSucces("");
     setChargement(true);
 
     try {
       if (estInscription) {
-        // 1. INSCRIPTION (JSON)
-        const res = await fetch("http://127.0.0.1:8000/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, nom }),
+        // ================= INSCRIPTION =================
+        // On utilise api.js au lieu de 127.0.0.1
+        await inscrireUtilisateur({
+          email,
+          password,
+          nom,
         });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Erreur lors de l'inscription");
 
         setEstInscription(false);
-        setSucces("Compte créé avec succès ! Vous pouvez maintenant vous connecter.");
+        setSucces(
+          "Compte créé avec succès ! Vous pouvez maintenant vous connecter."
+        );
         setPassword("");
+        setNom("");
       } else {
-        // 2. CONNEXION (OAuth2Form Data)
-        const formData = new URLSearchParams();
-        formData.append("username", email);
-        formData.append("password", password);
+        // ================= CONNEXION =================
+        // La requête part vers Render grâce à api.js
+        const data = await seConnecterAPI(email, password);
 
-        const res = await fetch("http://127.0.0.1:8000/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formData,
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Identifiants ou mot de passe incorrects");
-
+        // Stockage de la session via AuthContext
         seConnecter(data.access_token);
+
+        // Redirection après connexion
         navigate(destination, { replace: true });
       }
     } catch (err) {
-      setErreur(err.message);
+      setErreur(
+        err.message || "Une erreur est survenue. Veuillez réessayer."
+      );
     } finally {
       setChargement(false);
     }
@@ -67,6 +68,7 @@ function Connexion() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 transition-colors duration-200">
+
         <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-6">
           {estInscription ? "Créer un compte" : "Connexion"}
         </h2>
@@ -86,11 +88,14 @@ function Connexion() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Nom : uniquement pendant l'inscription */}
           {estInscription && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Nom complet
               </label>
+
               <input
                 type="text"
                 required
@@ -101,10 +106,12 @@ function Connexion() {
             </div>
           )}
 
+          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Adresse Email
             </label>
+
             <input
               type="email"
               required
@@ -114,10 +121,12 @@ function Connexion() {
             />
           </div>
 
+          {/* Mot de passe */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Mot de passe
             </label>
+
             <input
               type="password"
               required
@@ -127,6 +136,7 @@ function Connexion() {
             />
           </div>
 
+          {/* Bouton */}
           <button
             type="submit"
             disabled={chargement}
@@ -140,9 +150,14 @@ function Connexion() {
           </button>
         </form>
 
+        {/* Changer entre connexion et inscription */}
         <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-          {estInscription ? "Déjà un compte ?" : "Pas encore de compte ?"} {" "}
+          {estInscription
+            ? "Déjà un compte ?"
+            : "Pas encore de compte?"}{" "}
+
           <button
+            type="button"
             onClick={() => {
               setEstInscription(!estInscription);
               setErreur("");
@@ -153,6 +168,7 @@ function Connexion() {
             {estInscription ? "Se connecter" : "S'inscrire"}
           </button>
         </p>
+
       </div>
     </div>
   );
