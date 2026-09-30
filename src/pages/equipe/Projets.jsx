@@ -6,6 +6,8 @@ import {
   supprimerProjet,
   getUtilisateurs,
 } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+import Toast from "../../components/Toast";
 import "../Projets.css";
 
 export default function Projets() {
@@ -15,16 +17,32 @@ export default function Projets() {
   const [description, setDescription] = useState("");
   const [statut, setStatut] = useState("En cours");
   const [responsable, setResponsable] = useState("");
-  const [erreur, setErreur] = useState("");
+  const [notification, setNotification] = useState({ message: "", type: "success" });
+
+  // 🔹 Récupération du rôle depuis le contexte d'authentification
+  const { estAdmin } = useAuth();
+
+  const afficherToast = (message, type = "success") => {
+    const toutToastActif = localStorage.getItem("notifications") !== "false";
+    if (toutToastActif) {
+      setNotification({ message, type });
+    }
+  };
+
+  const masquerToast = () => {
+    setNotification({ message: "", type: "success" });
+  };
 
   const chargerDonnees = async () => {
     try {
-      const listeProjets = await getProjets();
-      const listeMembres = await getUtilisateurs();
-      setProjets(listeProjets);
-      setMembres(listeMembres);
+      const [projetsData, membresData] = await Promise.all([
+        getProjets(),
+        getUtilisateurs(),
+      ]);
+      setProjets(projetsData);
+      setMembres(membresData);
     } catch (err) {
-      setErreur("Erreur lors du chargement des données.");
+      afficherToast(err.message || "Erreur de chargement des données.", "error");
     }
   };
 
@@ -32,9 +50,10 @@ export default function Projets() {
     chargerDonnees();
   }, []);
 
-  const handleAjouter = async (e) => {
+  const handleAjouterProjet = async (e) => {
     e.preventDefault();
-    if (!titre) return;
+    if (!titre.trim()) return;
+
     try {
       await ajouterProjet({
         titre,
@@ -47,8 +66,9 @@ export default function Projets() {
       setStatut("En cours");
       setResponsable("");
       chargerDonnees();
+      afficherToast("Projet créé avec succès !", "success");
     } catch (err) {
-      setErreur("Erreur lors de la création du projet.");
+      afficherToast(err.message || "Erreur lors de la création du projet.", "error");
     }
   };
 
@@ -56,36 +76,37 @@ export default function Projets() {
     try {
       await modifierProjet(id, { statut: nouveauStatut });
       chargerDonnees();
+      afficherToast("Statut du projet mis à jour.", "success");
     } catch (err) {
-      setErreur("Erreur lors du changement de statut.");
+      afficherToast(err.message || "Erreur de mise à jour.", "error");
     }
   };
 
-  const handleSupprimer = async (id) => {
+  const handleSupprimerProjet = async (id) => {
+    if (!window.confirm("Voulez-vous vraiment supprimer ce projet ?")) return;
     try {
       await supprimerProjet(id);
       chargerDonnees();
+      afficherToast("Projet supprimé.", "info");
     } catch (err) {
-      setErreur("Erreur lors de la suppression.");
+      afficherToast(err.message || "Erreur lors de la suppression.", "error");
     }
-  };
-
-  const getBadgeClass = (s) => {
-    if (s === "Terminé") return "badge-termine";
-    if (s === "En cours") return "badge-en-cours";
-    return "badge-en-attente";
   };
 
   return (
     <div className="projets-container">
+      <Toast
+        message={notification.message}
+        type={notification.type}
+        onClose={masquerToast}
+      />
+
       <h2 className="title">Gestion des Projets</h2>
 
-      {erreur && <div style={{ color: "#e11d48", marginBottom: "12px" }}>{erreur}</div>}
-
-      {/* Formulaire d'ajout */}
-      <div className="form-card">
-        <form onSubmit={handleAjouter} className="form-grid">
-          <div>
+      {/* 🔒 Seul un ADMIN peut créer un nouveau projet */}
+      {estAdmin && (
+        <div className="form-card">
+          <form onSubmit={handleAjouterProjet} className="form-grid">
             <input
               className="form-input"
               type="text"
@@ -94,9 +115,6 @@ export default function Projets() {
               onChange={(e) => setTitre(e.target.value)}
               required
             />
-          </div>
-
-          <div>
             <select
               className="form-select"
               value={responsable}
@@ -109,18 +127,14 @@ export default function Projets() {
                 </option>
               ))}
             </select>
-          </div>
 
-          <div className="form-grid-full">
             <textarea
-              className="form-textarea"
+              className="form-textarea form-grid-full"
               placeholder="Description du projet..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
-          </div>
 
-          <div className="form-grid-full">
             <select
               className="form-select"
               value={statut}
@@ -130,48 +144,68 @@ export default function Projets() {
               <option value="En attente">En attente</option>
               <option value="Terminé">Terminé</option>
             </select>
-          </div>
 
-          <button type="submit" className="btn-add">
-            Créer le projet
-          </button>
-        </form>
-      </div>
+            <button type="submit" className="btn-add">
+              Créer le projet
+            </button>
+          </form>
+        </div>
+      )}
 
-      {/* Liste des cartes projets */}
+      {/* Cartes des Projets */}
       <div className="projets-grid">
-        {projets.map((p) => (
-          <div key={p.id} className="projet-card">
-            <div>
-              <div className="projet-header">
-                <span className="projet-title">{p.titre}</span>
-                <span className={`badge-statut ${getBadgeClass(p.statut)}`}>
-                  {p.statut}
-                </span>
+        {projets.length === 0 ? (
+          <p style={{ color: "#64748b" }}>Aucun projet enregistré.</p>
+        ) : (
+          projets.map((p) => (
+            <div key={p.id} className="projet-card">
+              <div>
+                <div className="projet-header">
+                  <span className="projet-title">{p.titre}</span>
+                  <span
+                    className={`badge-statut ${
+                      p.statut === "Terminé"
+                        ? "badge-termine"
+                        : p.statut === "En cours"
+                        ? "badge-en-cours"
+                        : "badge-en-attente"
+                    }`}
+                  >
+                    {p.statut}
+                  </span>
+                </div>
+                <p className="projet-desc">
+                  {p.description || "Aucune description renseignée."}
+                </p>
+                <p className="projet-responsable">
+                  👤 Responsable : <strong>{p.responsable}</strong>
+                </p>
               </div>
-              <p className="projet-desc">{p.description || "Aucune description."}</p>
-              <p className="projet-responsable">👤 Responsable : {p.responsable}</p>
-            </div>
 
-            <div className="actions-row">
-              <select
-                className="select-statut"
-                value={p.statut}
-                onChange={(e) => handleChangerStatut(p.id, e.target.value)}
-              >
-                <option value="En cours">En cours</option>
-                <option value="En attente">En attente</option>
-                <option value="Terminé">Terminé</option>
-              </select>
-              <button
-                className="btn-delete"
-                onClick={() => handleSupprimer(p.id)}
-              >
-                Supprimer
-              </button>
+              <div className="actions-row">
+                <select
+                  className="select-statut"
+                  value={p.statut}
+                  onChange={(e) => handleChangerStatut(p.id, e.target.value)}
+                >
+                  <option value="En cours">En cours</option>
+                  <option value="En attente">En attente</option>
+                  <option value="Terminé">Terminé</option>
+                </select>
+
+                {/* 🔒 Seul un ADMIN peut supprimer un projet */}
+                {estAdmin && (
+                  <button
+                    className="btn-delete"
+                    onClick={() => handleSupprimerProjet(p.id)}
+                  >
+                    Supprimer
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

@@ -1,43 +1,29 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
 function Page404() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ textAlign: "center", padding: "50px 20px" }}>
-      <h1 style={{ fontSize: "72px", margin: "0", color: "#e74c3c" }}>404</h1>
-      <h2>Oups ! Page introuvable</h2>
-      <p style={{ color: "#7f8c8d" }}>
-        La page que vous recherchez n'existe pas ou a été déplacée.
+    <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
+      <h1 className="text-8xl font-extrabold text-red-500 tracking-tight">404</h1>
+      <h2 className="text-2xl font-bold text-gray-800 mt-4">Oups ! Page introuvable</h2>
+      <p className="text-gray-500 mt-2 max-w-md">
+        La page que vous recherchez n'existe pas, a été supprimée ou a été déplacée.
       </p>
 
-      <div style={{ marginTop: "30px", display: "flex", gap: "15px", justifyContent: "center" }}>
-        <button 
-          onClick={() => navigate('/')}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: "#2c3e50",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer"
-          }}
+      <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center w-full max-w-xs sm:max-w-none">
+        <button
+          onClick={() => navigate("/")}
+          className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
         >
-          🏠 Retour à l'accueil
+          <span>🏠</span> Retour à l'accueil
         </button>
 
-        <button 
+        <button
           onClick={() => navigate(-1)}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: "#95a5a6",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer"
-          }}
+          className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
         >
-          ⬅️ Page précédente
+          <span>⬅️</span> Page précédente
         </button>
       </div>
     </div>
