@@ -8,7 +8,7 @@ import {
 } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "../../components/Toast";
-import "../Equipe.css";
+import "../equipe.css";
 
 export default function Membres() {
   const [membres, setMembres] = useState([]);
