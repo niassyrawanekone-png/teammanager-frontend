@@ -4,11 +4,12 @@ import { useAuth } from "../context/AuthContext";
 
 function Navbar() {
   const [menuOuvert, setMenuOuvert] = useState(false);
-  const { estConnecte, seDeconnecter } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
 
   const handleDeconnexion = () => {
-    seDeconnecter();
+    sessionStorage.clear();
+    if (setUser) setUser(null);
     setMenuOuvert(false);
     navigate("/connexion");
   };
@@ -38,13 +39,21 @@ function Navbar() {
           </Link>
 
           {/* Navigation Desktop */}
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-5">
             <NavLink to="/equipe" end className={navLinkStyle}>
               Équipe
             </NavLink>
             <NavLink to="/equipe/projets" className={navLinkStyle}>
               Projets
             </NavLink>
+            
+            {/* Lien Discussion & Chat visible si connecté */}
+            {user && (
+              <NavLink to="/espace-partage" className={navLinkStyle}>
+                💬 Discussion & Chat
+              </NavLink>
+            )}
+
             <NavLink to="/parametres" className={navLinkStyle}>
               Paramètres
             </NavLink>
@@ -53,14 +62,14 @@ function Navbar() {
             </NavLink>
 
             {/* Lien Mon Profil visible uniquement si connecté */}
-            {estConnecte && (
+            {user && (
               <NavLink to="/profil" className={navLinkStyle}>
                 Mon Profil
               </NavLink>
             )}
 
             {/* Connexion / Déconnexion */}
-            {estConnecte ? (
+            {user ? (
               <button
                 onClick={handleDeconnexion}
                 className="text-sm font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 transition-colors"
@@ -106,6 +115,13 @@ function Navbar() {
           <NavLink to="/equipe/projets" className={mobileNavLinkStyle} onClick={() => setMenuOuvert(false)}>
             Projets
           </NavLink>
+
+          {user && (
+            <NavLink to="/espace-partage" className={mobileNavLinkStyle} onClick={() => setMenuOuvert(false)}>
+              💬 Discussion & Chat
+            </NavLink>
+          )}
+
           <NavLink to="/parametres" className={mobileNavLinkStyle} onClick={() => setMenuOuvert(false)}>
             Paramètres
           </NavLink>
@@ -113,13 +129,13 @@ function Navbar() {
             À Propos
           </NavLink>
 
-          {estConnecte && (
+          {user && (
             <NavLink to="/profil" className={mobileNavLinkStyle} onClick={() => setMenuOuvert(false)}>
               Mon Profil
             </NavLink>
           )}
 
-          {estConnecte ? (
+          {user ? (
             <button
               onClick={handleDeconnexion}
               className="w-full text-left py-2 px-3 text-base font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"

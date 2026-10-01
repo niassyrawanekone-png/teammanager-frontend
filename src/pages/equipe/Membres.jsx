@@ -18,7 +18,7 @@ export default function Membres() {
   const [recherche, setRecherche] = useState("");
   const [notification, setNotification] = useState({ message: "", type: "success" });
 
-  // On récupère l'information du rôle depuis le contexte
+  // Récupération du rôle administrateur depuis le contexte d'authentification
   const { estAdmin } = useAuth();
 
   const afficherToast = (message, type = "success") => {
@@ -35,7 +35,9 @@ export default function Membres() {
   const chargerMembres = async () => {
     try {
       const data = await getUtilisateurs();
-      setMembres(data);
+      if (Array.isArray(data)) {
+        setMembres(data);
+      }
     } catch (err) {
       afficherToast(err.message || "Impossible de charger la liste de l'équipe.", "error");
     }
@@ -47,14 +49,22 @@ export default function Membres() {
 
   const handleAjouter = async (e) => {
     e.preventDefault();
-    if (!nom.trim()) return;
+    if (!nom.trim() || !email.trim()) return;
+
     try {
-      await ajouterUtilisateur({ nom, email, role });
+      // On envoie un mot de passe par défaut ("Team2026!") exigé par le backend
+      await ajouterUtilisateur({
+        nom: nom.trim(),
+        email: email.trim(),
+        password: "Team2026!",
+        role: role,
+      });
+
       setNom("");
       setEmail("");
       setRole("Membre");
       chargerMembres();
-      afficherToast("Membre ajouté avec succès !", "success");
+      afficherToast("Membre ajouté avec succès (mot de passe temporaire : Team2026!)", "success");
     } catch (err) {
       afficherToast(err.message || "Erreur lors de l'ajout du membre.", "error");
     }
@@ -83,7 +93,7 @@ export default function Membres() {
   };
 
   const membresFiltres = membres.filter((m) =>
-    m.nom.toLowerCase().includes(recherche.toLowerCase()) ||
+    (m.nom || "").toLowerCase().includes(recherche.toLowerCase()) ||
     (m.email && m.email.toLowerCase().includes(recherche.toLowerCase()))
   );
 
@@ -133,7 +143,7 @@ export default function Membres() {
         </div>
       )}
 
-      {/* Recherche */}
+      {/* Barre de recherche */}
       <div style={{ marginBottom: "20px" }}>
         <input
           className="form-input"
@@ -154,13 +164,13 @@ export default function Membres() {
             <div key={m.id} className="member-card">
               <div>
                 <div className="member-header">
-                  <span className="member-name">{m.nom}</span>
+                  <span className="member-name">{m.nom || "Sans nom"}</span>
                   <span
                     className={`badge ${
                       m.role === "Admin" ? "badge-admin" : "badge-membre"
                     }`}
                   >
-                    {m.role}
+                    {m.role || "Membre"}
                   </span>
                 </div>
                 <div className="member-email">
@@ -186,7 +196,7 @@ export default function Membres() {
                   Voir profil
                 </Link>
 
-                {/* 🔒 Seul un ADMIN a accès aux boutons d'édition/suppression */}
+                {/* 🔒 Seul un ADMIN a accès aux boutons de promotion et suppression */}
                 {estAdmin && (
                   <>
                     <button
