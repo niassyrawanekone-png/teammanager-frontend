@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://teammanager-fl0y.onrender.com";
+const BASE_URL = "https://teammanager-fl0y.onrender.com";
 
 // Helper interne pour récupérer les headers d'authentification HTTP
 const getAuthHeaders = () => {
