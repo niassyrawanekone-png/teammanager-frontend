@@ -1,68 +1,114 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getMessagesPartage, ajouterMessagePartage, supprimerMessagePartage } from "../services/api";
 
 export default function EspacePartage() {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      auteur: "Rawane Kone Niassy",
-      contenu: "Bienvenue sur l'espace de partage ! Vous pouvez copier ici le code ou le résumé de votre travail terminé.",
-      date: "Aujourd'hui"
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [nouveauMessage, setNouveauMessage] = useState("");
+  const [projetAssocie, setProjetAssocie] = useState("");
+  const [chargement, setChargement] = useState(true);
 
-  const handleEnvoyer = (e) => {
+  const chargerMessages = async () => {
+    try {
+      const data = await getMessagesPartage();
+      setMessages(data);
+    } catch (err) {
+      console.error(err.message);
+    } finally {
+      setChargement(false);
+    }
+  };
+
+  useEffect(() => {
+    chargerMessages();
+  }, []);
+
+  const handlePublier = async (e) => {
     e.preventDefault();
     if (!nouveauMessage.trim()) return;
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const item = {
-      id: Date.now(),
-      auteur: user.nom || user.email || "Membre",
-      contenu: nouveauMessage,
-      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
+    const texteFinal = projetAssocie 
+      ? `[Projet : ${projetAssocie}]\n${nouveauMessage}`
+      : nouveauMessage;
 
-    setMessages([item, ...messages]);
-    setNouveauMessage("");
+    try {
+      await ajouterMessagePartage({ contenu: texteFinal });
+      setNouveauMessage("");
+      setProjetAssocie("");
+      chargerMessages();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleSupprimer = async (id) => {
+    if (window.confirm("Voulez-vous supprimer ce message ?")) {
+      try {
+        await supprimerMessagePartage(id);
+        chargerMessages();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 md:p-10">
+    <div className="max-w-4xl mx-auto p-6 bg-white min-h-screen text-gray-900">
       <div className="mb-8">
-        <h2 className="text-3xl font-extrabold text-gray-800">💬 Espace de Partage & Discussion</h2>
-        <p className="text-gray-600 mt-2">Partagez vos livrables finaux, vos bouts de code ou vos remarques avec l'équipe.</p>
+        <h1 className="text-3xl font-extrabold text-gray-900">💬 Espace de Discussion & Partage</h1>
+        <p className="text-gray-600 mt-1">Partagez vos livrables, codes et échangez sur les projets de l'équipe.</p>
       </div>
 
-      <form onSubmit={handleEnvoyer} className="bg-white p-6 rounded-2xl shadow-md border border-gray-100 mb-8">
+      <form onSubmit={handlePublier} className="bg-gray-50 p-6 rounded-2xl border border-gray-200 mb-8 space-y-4">
+        <input
+          type="text"
+          placeholder="Nom du projet ou rôle concerné (ex: Projet UTE - Module Auth)"
+          className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500"
+          value={projetAssocie}
+          onChange={(e) => setProjetAssocie(e.target.value)}
+        />
         <textarea
-          rows="3"
-          className="w-full p-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-gray-700 placeholder-gray-400"
-          placeholder="Collez le lien de votre travail, un compte-rendu ou un message..."
+          rows="4"
+          required
+          placeholder="Collez votre code, lien de travail ou message ici..."
+          className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500"
           value={nouveauMessage}
           onChange={(e) => setNouveauMessage(e.target.value)}
         />
-        <div className="flex justify-end mt-4">
-          <button
-            type="submit"
-            className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-6 rounded-xl transition duration-200 shadow-sm"
-          >
-            Publier mon travail
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-sm"
+        >
+          Publier le travail
+        </button>
       </form>
 
-      <div className="space-y-4">
-        {messages.map((msg) => (
-          <div key={msg.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition hover:shadow-md">
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-bold text-teal-800 text-lg">{msg.auteur}</span>
-              <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">{msg.date}</span>
+      {chargement ? (
+        <p className="text-gray-500">Chargement de la discussion...</p>
+      ) : (
+        <div className="space-y-4">
+          {messages.map((msg) => (
+            <div key={msg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-bold text-teal-800 text-lg">{msg.auteur_nom}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(msg.created_at).toLocaleDateString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+                <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">{msg.contenu}</p>
+              </div>
+              <div className="mt-4 text-right">
+                <button
+                  onClick={() => handleSupprimer(msg.id)}
+                  className="text-xs font-bold text-red-600 hover:underline"
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
-            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{msg.contenu}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
