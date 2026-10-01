@@ -122,6 +122,21 @@ export const supprimerProjet = (id) =>
     method: "DELETE",
   });
 
+/* ================= ESPACE DE PARTAGE / DISCUSSION ================= */
+
+export const getMessagesPartage = () => request("/partage/");
+
+export const ajouterMessagePartage = (donnees) =>
+  request("/partage/", {
+    method: "POST",
+    body: JSON.stringify(donnees),
+  });
+
+export const supprimerMessagePartage = (id) =>
+  request(`/partage/${id}`, {
+    method: "DELETE",
+  });
+
 /* ================= MODIFICATION PROFIL PERSO ================= */
 
 export const modifierMonNom = (nom) =>
