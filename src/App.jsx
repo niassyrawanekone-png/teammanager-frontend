@@ -97,6 +97,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <route
+                path="/inscription"
+                element={
+                  <ProtectedRoute>
+                    <Inscription />
+                  </ProtectedRoute>
+                }
+              />  
               {/* Route Fallback */}
               <Route path="*" element={<Page404 />} />
             </Routes>
