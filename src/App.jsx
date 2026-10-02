@@ -16,7 +16,6 @@ import Page404 from './pages/Page404';
 import Profil from './pages/Profil';
 import EspacePartage from './pages/EspacePartage';
 import Inscription from './pages/Inscription';
-import Projets from './pages/Projets';
 
 function App() {
   // Appliquer le thème enregistré dans localStorage au démarrage
