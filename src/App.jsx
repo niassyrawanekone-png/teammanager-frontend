@@ -15,7 +15,7 @@ import Parametres from './pages/Parametres';
 import Page404 from './pages/Page404';
 import Profil from './pages/Profil';
 import EspacePartage from './pages/EspacePartage';
-import Inscription from './pages/Inscription';
+import Inscription from './pages/Inscription2';
 
 function App() {
   // Appliquer le thème enregistré dans localStorage au démarrage
@@ -97,7 +97,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <route
+              <Route
                 path="/inscription"
                 element={
                   <ProtectedRoute>
