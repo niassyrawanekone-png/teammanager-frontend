@@ -1,23 +1,26 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { API_URL } from "../services/api";
+import { normalizeRole } from "../services/roles";
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [estConnecte, setEstConnecte] = useState(false);
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(() => sessionStorage.getItem("token") || localStorage.getItem("token"));
+  const [estConnecte, setEstConnecte] = useState(() =>
+    Boolean(sessionStorage.getItem("token") || localStorage.getItem("token"))
+  );
   // Nouvel état : stocke les infos de l'utilisateur (id, nom, email, role)
   const [utilisateurConnecte, setUtilisateurConnecte] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() =>
+    Boolean(sessionStorage.getItem("token") || localStorage.getItem("token"))
+  );
 
   // Vérification de la session au démarrage
   useEffect(() => {
-    const savedToken = sessionStorage.getItem("token");
+    const savedToken = sessionStorage.getItem("token") || localStorage.getItem("token");
     if (savedToken) {
-      setToken(savedToken);
-      setEstConnecte(true);
-      
       // On tente de charger le profil de l'utilisateur connecté depuis l'API
-      fetch("http://127.0.0.1:8000/api/me", {
+      fetch(`${API_URL}/me`, {
         headers: { Authorization: `Bearer ${savedToken}` }
       })
         .then((res) => {
@@ -25,27 +28,33 @@ export function AuthProvider({ children }) {
           throw new Error("Token invalide");
         })
         .then((user) => setUtilisateurConnecte(user))
-        .catch(() => {
+        .catch((error) => {
+          console.error("Erreur de récupération du profil:", error);
           // Si le token est invalide/expiré, on déconnecte
           sessionStorage.removeItem("token");
+          localStorage.removeItem("token");
+          sessionStorage.removeItem("user");
+          localStorage.removeItem("user");
           setToken(null);
           setEstConnecte(false);
           setUtilisateurConnecte(null);
         })
         .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
     }
   }, []);
 
-  const seConnecter = async (newToken) => {
+  const seConnecter = async (utilisateur, newToken) => {
     sessionStorage.setItem("token", newToken);
+    localStorage.setItem("token", newToken);
+    sessionStorage.setItem("user", JSON.stringify(utilisateur));
+    localStorage.setItem("user", JSON.stringify(utilisateur));
     setToken(newToken);
+    setUtilisateurConnecte(utilisateur);
     setEstConnecte(true);
 
     // Récupérer le profil juste après la connexion
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/me", {
+      const res = await fetch(`${API_URL}/me`, {
         headers: { Authorization: `Bearer ${newToken}` }
       });
       if (res.ok) {
@@ -59,13 +68,17 @@ export function AuthProvider({ children }) {
 
   const seDeconnecter = () => {
     sessionStorage.removeItem("token");
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+    localStorage.removeItem("user");
     setToken(null);
     setEstConnecte(false);
     setUtilisateurConnecte(null);
   };
 
   // Indique facilement si l'utilisateur actuellement connecté est un Administrateur
-  const estAdmin = utilisateurConnecte?.role === "Admin";
+  const role = normalizeRole(utilisateurConnecte?.role);
+  const estAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
 
   return (
     <AuthContext.Provider
@@ -84,4 +97,6 @@ export function AuthProvider({ children }) {
   );
 }
 
+// Le hook est exporté depuis ce contexte, comme dans le template Vite.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

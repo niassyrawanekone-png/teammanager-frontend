@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   getProjets,
   ajouterProjet,
@@ -8,201 +8,353 @@ import {
 } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "../../components/Toast";
-import "../Projets.css";
+import { normalizeRole } from "../../services/roles";
 
 export default function Projets() {
   const [projets, setProjets] = useState([]);
-  const [membres, setMembres] = useState([]);
+  const [utilisateurs, setUtilisateurs] = useState([]);
+
+  // Champs Formulaire
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
+  const [chefId, setChefId] = useState("");
+  const [sousChefId, setSousChefId] = useState("");
+  const [membresSelectionnes, setMembresSelectionnes] = useState([]);
   const [statut, setStatut] = useState("En cours");
-  const [responsable, setResponsable] = useState("");
+
   const [notification, setNotification] = useState({ message: "", type: "success" });
 
-  // 🔹 Récupération du rôle depuis le contexte d'authentification
-  const { estAdmin } = useAuth();
+  const { utilisateurConnecte } = useAuth();
 
-  const afficherToast = (message, type = "success") => {
-    const toutToastActif = localStorage.getItem("notifications") !== "false";
-    if (toutToastActif) {
-      setNotification({ message, type });
-    }
-  };
+  // Récupération de secours depuis la session locale
+  const storedUser = JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "{}");
+  const userActuel = utilisateurConnecte || storedUser;
+  const userRole = normalizeRole(userActuel?.role);
 
-  const masquerToast = () => {
-    setNotification({ message: "", type: "success" });
-  };
+  // Autorise la création aux administrateurs et chefs de projet.
+  const peutCreerProjet =
+    userRole === "SUPER_ADMIN" ||
+    userRole === "ADMIN" ||
+    userRole === "CHEF_DE_PROJET";
 
   const chargerDonnees = async () => {
     try {
-      const [projetsData, membresData] = await Promise.all([
+      const [projetsData, usersData] = await Promise.all([
         getProjets(),
         getUtilisateurs(),
       ]);
-      setProjets(projetsData);
-      setMembres(membresData);
+      setProjets(projetsData || []);
+      setUtilisateurs(usersData || []);
     } catch (err) {
-      afficherToast(err.message || "Erreur de chargement des données.", "error");
+      setNotification({ message: err.message || "Erreur de chargement.", type: "error" });
     }
   };
 
   useEffect(() => {
-    chargerDonnees();
+    let actif = true;
+    const charger = async () => {
+      try {
+        const [projetsData, usersData] = await Promise.all([
+          getProjets(),
+          getUtilisateurs(),
+        ]);
+        if (actif) {
+          setProjets(projetsData || []);
+          setUtilisateurs(usersData || []);
+        }
+      } catch (err) {
+        if (actif) {
+          setNotification({
+            message: err.message || "Erreur de chargement.",
+            type: "error",
+          });
+        }
+      }
+    };
+
+    void charger();
+    return () => {
+      actif = false;
+    };
   }, []);
 
-  const handleAjouterProjet = async (e) => {
+  const handleToggleMembre = (userId) => {
+    if (membresSelectionnes.includes(userId)) {
+      setMembresSelectionnes(membresSelectionnes.filter((id) => id !== userId));
+    } else {
+      setMembresSelectionnes([...membresSelectionnes, userId]);
+    }
+  };
+
+  const handleCreerProjet = async (e) => {
     e.preventDefault();
     if (!titre.trim()) return;
 
     try {
       await ajouterProjet({
-        titre,
-        description,
+        titre: titre.trim(),
+        description: description,
+        chef_id: chefId || userActuel?.id,
+        sous_chef_id: sousChefId,
+        membres_ids: membresSelectionnes,
         statut,
-        responsable: responsable || "Non assigné",
       });
+
       setTitre("");
       setDescription("");
+      setChefId("");
+      setSousChefId("");
+      setMembresSelectionnes([]);
       setStatut("En cours");
-      setResponsable("");
-      chargerDonnees();
-      afficherToast("Projet créé avec succès !", "success");
+
+      await chargerDonnees();
+      setNotification({ message: "Projet créé avec succès !", type: "success" });
     } catch (err) {
-      afficherToast(err.message || "Erreur lors de la création du projet.", "error");
+      setNotification({ message: err.message || "Erreur lors de la création.", type: "error" });
     }
   };
 
   const handleChangerStatut = async (id, nouveauStatut) => {
     try {
       await modifierProjet(id, { statut: nouveauStatut });
-      chargerDonnees();
-      afficherToast("Statut du projet mis à jour.", "success");
+      await chargerDonnees();
+      setNotification({ message: "Statut mis à jour.", type: "success" });
     } catch (err) {
-      afficherToast(err.message || "Erreur de mise à jour.", "error");
+      setNotification({ message: err.message || "Erreur de mise à jour.", type: "error" });
     }
   };
 
-  const handleSupprimerProjet = async (id) => {
-    if (!window.confirm("Voulez-vous vraiment supprimer ce projet ?")) return;
+  const handleSupprimer = async (id) => {
+    if (!window.confirm("Voulez-vous supprimer ce projet ?")) return;
     try {
       await supprimerProjet(id);
-      chargerDonnees();
-      afficherToast("Projet supprimé.", "info");
+      await chargerDonnees();
+      setNotification({ message: "Projet supprimé.", type: "info" });
     } catch (err) {
-      afficherToast(err.message || "Erreur lors de la suppression.", "error");
+      setNotification({ message: err.message || "Erreur de suppression.", type: "error" });
     }
+  };
+
+  const getUserName = (id) => {
+    const user = utilisateurs.find((u) => u.id === id);
+    return user ? user.nom : "Non assigné";
   };
 
   return (
-    <div className="projets-container">
+    <div className="max-w-6xl mx-auto p-4 space-y-8">
       <Toast
         message={notification.message}
         type={notification.type}
-        onClose={masquerToast}
+        onClose={() => setNotification({ message: "", type: "success" })}
       />
 
-      <h2 className="title">Gestion des Projets</h2>
+      <div className="flex justify-between items-center border-b pb-4 border-gray-200 dark:border-gray-700">
+        <div>
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
+            Gestion des Projets
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Créez, attribuez et gérez l'avancement des projets de votre équipe
+          </p>
+        </div>
+      </div>
 
-      {/* 🔒 Seul un ADMIN peut créer un nouveau projet */}
-      {estAdmin && (
-        <div className="form-card">
-          <form onSubmit={handleAjouterProjet} className="form-grid">
-            <input
-              className="form-input"
-              type="text"
-              placeholder="Titre du projet"
-              value={titre}
-              onChange={(e) => setTitre(e.target.value)}
-              required
-            />
-            <select
-              className="form-select"
-              value={responsable}
-              onChange={(e) => setResponsable(e.target.value)}
-            >
-              <option value="">-- Choisir un responsable --</option>
-              {membres.map((m) => (
-                <option key={m.id} value={m.nom}>
-                  {m.nom}
-                </option>
-              ))}
-            </select>
+      {/* Formulaire de création de projet (Garantie d'affichage pour l'Administrateur) */}
+      {peutCreerProjet && (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 space-y-6">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-700">
+            ➕ Créer un nouveau projet
+          </h2>
 
-            <textarea
-              className="form-textarea form-grid-full"
-              placeholder="Description du projet..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+          <form onSubmit={handleCreerProjet} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
+                Titre du projet
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="ex: Projet UTE - Module Auth"
+                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                value={titre}
+                onChange={(e) => setTitre(e.target.value)}
+              />
+            </div>
 
-            <select
-              className="form-select"
-              value={statut}
-              onChange={(e) => setStatut(e.target.value)}
-            >
-              <option value="En cours">En cours</option>
-              <option value="En attente">En attente</option>
-              <option value="Terminé">Terminé</option>
-            </select>
+            <div>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
+                Description du projet (multi-lignes)
+              </label>
+              <textarea
+                rows="5"
+                placeholder="Objectifs du projet, étapes, livrables attendus..."
+                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm font-sans leading-relaxed outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ whiteSpace: "pre-wrap" }}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
 
-            <button type="submit" className="btn-add">
-              Créer le projet
-            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
+                  Chef de projet
+                </label>
+                <select
+                  className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm"
+                  value={chefId}
+                  onChange={(e) => setChefId(e.target.value)}
+                >
+                  <option value="">-- Choisir le chef de projet --</option>
+                  {utilisateurs.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nom} ({u.role || "Membre"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
+                  Sous-chef de projet
+                </label>
+                <select
+                  className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm"
+                  value={sousChefId}
+                  onChange={(e) => setSousChefId(e.target.value)}
+                >
+                  <option value="">-- Choisir le sous-chef --</option>
+                  {utilisateurs.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nom} ({u.role || "Membre"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Sélection des membres du projet */}
+            <div>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2">
+                Sélectionner les membres participants ({membresSelectionnes.length})
+              </label>
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                {utilisateurs.map((u) => {
+                  const estCoche = membresSelectionnes.includes(u.id);
+                  return (
+                    <button
+                      type="button"
+                      key={u.id}
+                      onClick={() => handleToggleMembre(u.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                        estCoche
+                          ? "bg-blue-600 text-white"
+                          : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                      }`}
+                    >
+                      {estCoche ? "✓ " : "+ "}
+                      {u.nom}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <select
+                className="p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white"
+                value={statut}
+                onChange={(e) => setStatut(e.target.value)}
+              >
+                <option value="En cours">En cours</option>
+                <option value="En attente">En attente</option>
+                <option value="Terminé">Terminé</option>
+              </select>
+
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow-md transition"
+              >
+                Créer le projet
+              </button>
+            </div>
           </form>
         </div>
       )}
 
       {/* Cartes des Projets */}
-      <div className="projets-grid">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {projets.length === 0 ? (
-          <p style={{ color: "#64748b" }}>Aucun projet enregistré.</p>
+          <p className="text-gray-500 dark:text-gray-400 italic">
+            Aucun projet enregistré. Utilisez le formulaire ci-dessus pour en créer un.
+          </p>
         ) : (
           projets.map((p) => (
-            <div key={p.id} className="projet-card">
+            <div
+              key={p.id}
+              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between space-y-4"
+            >
               <div>
-                <div className="projet-header">
-                  <span className="projet-title">{p.titre}</span>
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                    {p.titre}
+                  </h3>
                   <span
-                    className={`badge-statut ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-full ${
                       p.statut === "Terminé"
-                        ? "badge-termine"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
                         : p.statut === "En cours"
-                        ? "badge-en-cours"
-                        : "badge-en-attente"
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                        : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
                     }`}
                   >
                     {p.statut}
                   </span>
                 </div>
-                <p className="projet-desc">
-                  {p.description || "Aucune description renseignée."}
-                </p>
-                <p className="projet-responsable">
-                  👤 Responsable : <strong>{p.responsable}</strong>
-                </p>
+
+                <div
+                  className="text-gray-700 dark:text-gray-300 text-sm bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl mb-4 border border-gray-100 dark:border-gray-800 leading-relaxed"
+                  style={{ whiteSpace: "pre-wrap" }}
+                >
+                  {p.description || "Aucune description fournie."}
+                </div>
+
+                <div className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p>
+                    👑 <strong className="text-gray-700 dark:text-gray-300">Chef :</strong>{" "}
+                    {getUserName(p.chef_id)}
+                  </p>
+                  <p>
+                    🥈 <strong className="text-gray-700 dark:text-gray-300">Sous-Chef :</strong>{" "}
+                    {getUserName(p.sous_chef_id)}
+                  </p>
+                  <p>
+                    👥 <strong className="text-gray-700 dark:text-gray-300">Membres ({p.membres_ids?.length || 0}) :</strong>{" "}
+                    {p.membres_ids?.map((id) => getUserName(id)).join(", ") || "Aucun membre"}
+                  </p>
+                </div>
               </div>
 
-              <div className="actions-row">
-                <select
-                  className="select-statut"
-                  value={p.statut}
-                  onChange={(e) => handleChangerStatut(p.id, e.target.value)}
-                >
-                  <option value="En cours">En cours</option>
-                  <option value="En attente">En attente</option>
-                  <option value="Terminé">Terminé</option>
-                </select>
+              {peutCreerProjet && (
+                <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-gray-700">
+                  <select
+                    className="text-xs p-1.5 border border-gray-300 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
+                    value={p.statut}
+                    onChange={(e) => handleChangerStatut(p.id, e.target.value)}
+                  >
+                    <option value="En cours">En cours</option>
+                    <option value="En attente">En attente</option>
+                    <option value="Terminé">Terminé</option>
+                  </select>
 
-                {/* 🔒 Seul un ADMIN peut supprimer un projet */}
-                {estAdmin && (
                   <button
-                    className="btn-delete"
-                    onClick={() => handleSupprimerProjet(p.id)}
+                    onClick={() => handleSupprimer(p.id)}
+                    className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline"
                   >
                     Supprimer
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ))
         )}

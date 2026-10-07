@@ -3,19 +3,19 @@
   margin: 0 auto;
   padding: 24px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #333;
+  color: #336ff1;
 }
 
 .title {
   font-size: 24px;
   font-weight: bold;
   margin-bottom: 20px;
-  color: #1e293b;
+  color: #220bec;
 }
 
 /* Formulaire d'ajout */
 .form-card {
-  background: #ffffff;
+  background: #7beedf;
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);

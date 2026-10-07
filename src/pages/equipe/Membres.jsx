@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   getUtilisateurs,
@@ -8,6 +8,7 @@ import {
 } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "../../components/Toast";
+import { normalizeRole } from "../../services/roles";
 import "../equipe.css";
 
 export default function Membres() {
@@ -16,14 +17,17 @@ export default function Membres() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("Membre");
   const [recherche, setRecherche] = useState("");
-  const [chargement, setChargement] = useState(false);
+  const [chargement, setChargement] = useState(true);
   const [notification, setNotification] = useState({ message: "", type: "success" });
 
-  const { user } = useAuth();
-  
-  // 🔓 ASTUCE : On s'assure que les boutons s'affichent en vérifiant le rôle ou en autorisant l'accès
-  // Si user?.role est défini, on l'utilise, sinon on autorise par défaut pour ne pas bloquer l'affichage
-  const estAdmin = user ? (user.role === "Admin" || user.role === "admin") : true;
+  const { utilisateurConnecte, estAdmin: adminDuContexte } = useAuth();
+
+  // Récupération sécurisée de l'utilisateur stocké en session pour forcer l'affichage si admin
+  const storedUser = JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "{}");
+  const roleActuel = utilisateurConnecte?.role || storedUser?.role;
+
+  const roleNormalise = normalizeRole(roleActuel);
+  const estAdmin = adminDuContexte || roleNormalise === "ADMIN" || roleNormalise === "SUPER_ADMIN";
 
   const afficherToast = (message, type = "success") => {
     setNotification({ message, type });
@@ -48,7 +52,24 @@ export default function Membres() {
   };
 
   useEffect(() => {
-    chargerMembres();
+    let actif = true;
+    const charger = async () => {
+      try {
+        const data = await getUtilisateurs();
+        if (actif && Array.isArray(data)) setMembres(data);
+      } catch (err) {
+        if (actif) {
+          afficherToast(err.message || "Impossible de charger la liste de l'équipe.", "error");
+        }
+      } finally {
+        if (actif) setChargement(false);
+      }
+    };
+
+    void charger();
+    return () => {
+      actif = false;
+    };
   }, []);
 
   const handleAjouter = async (e) => {
@@ -59,7 +80,7 @@ export default function Membres() {
       await ajouterUtilisateur({
         nom: nom.trim(),
         email: email.trim(),
-        password: "Team2026!", // Mot de passe par défaut exigé par l'API backend
+        motDePasse: "123456",
         role: role,
       });
 
@@ -67,7 +88,7 @@ export default function Membres() {
       setEmail("");
       setRole("Membre");
       await chargerMembres();
-      afficherToast("Membre ajouté avec succès ! (Mot de passe temporaire : Team2026!)", "success");
+      afficherToast("Membre ajouté avec succès ! (Mot de passe par défaut : 123456)", "success");
     } catch (err) {
       afficherToast(err.message || "Erreur lors de l'ajout du membre.", "error");
     }
@@ -84,14 +105,13 @@ export default function Membres() {
     }
   };
 
-  const handlePromouvoir = async (id, roleActuel) => {
-    const nouveauRole = roleActuel === "Admin" ? "Membre" : "Admin";
+  const handleChangerRole = async (id, nouveauRole) => {
     try {
       await modifierRoleUtilisateur(id, nouveauRole);
       await chargerMembres();
-      afficherToast(`Rôle mis à jour : ${nouveauRole}`, "success");
+      afficherToast(`Grade mis à jour : ${nouveauRole}`, "success");
     } catch (err) {
-      afficherToast(err.message || "Erreur lors de la modification du rôle.", "error");
+      afficherToast(err.message || "Erreur lors de la modification du grade.", "error");
     }
   };
 
@@ -108,9 +128,9 @@ export default function Membres() {
         onClose={masquerToast}
       />
 
-      <h2 className="text-2xl font-bold mb-6">Gestion des Membres</h2>
+      <h2 className="text-2xl font-bold mb-6">Gestion des Membres et des Grades</h2>
 
-      {/* Formulaire d'ajout visible si les droits sont validés */}
+      {/* Formulaire d'ajout visible pour l'administrateur */}
       {estAdmin && (
         <div className="form-card bg-gray-50 dark:bg-gray-800 p-4 rounded-xl mb-6 border border-gray-200 dark:border-gray-700">
           <form onSubmit={handleAjouter} className="form-row flex flex-col sm:flex-row gap-3">
@@ -131,13 +151,15 @@ export default function Membres() {
               required
             />
             <select
-              className="form-select p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
+              className="form-select p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-medium"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               required
             >
               <option value="Membre">Membre</option>
-              <option value="Admin">Admin</option>
+              <option value="Sous-chef de Projet">Sous-chef de Projet</option>
+              <option value="Chef de Projet">Chef de Projet</option>
+              <option value="Administrateur">Administrateur</option>
             </select>
             <button type="submit" className="btn-add bg-teal-600 hover:bg-teal-700 text-white font-bold px-5 py-2.5 rounded-lg transition">
               Ajouter
@@ -172,7 +194,13 @@ export default function Membres() {
                     <span className="member-name font-bold text-gray-900 dark:text-white">{m.nom || "Sans nom"}</span>
                     <span
                       className={`badge px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        m.role === "Admin" ? "badge-admin bg-amber-100 text-amber-800" : "badge-membre bg-teal-100 text-teal-800"
+                        normalizeRole(m.role) === "ADMIN" || normalizeRole(m.role) === "SUPER_ADMIN"
+                          ? "badge-admin bg-amber-100 text-amber-800"
+                          : normalizeRole(m.role) === "CHEF_DE_PROJET"
+                          ? "bg-purple-100 text-purple-800"
+                          : normalizeRole(m.role) === "SOUS_CHEF_DE_PROJET"
+                          ? "bg-blue-100 text-blue-800"
+                          : "badge-membre bg-teal-100 text-teal-800"
                       }`}
                     >
                       {m.role || "Membre"}
@@ -183,7 +211,7 @@ export default function Membres() {
                   </div>
                 </div>
 
-                <div className="actions-row flex gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="actions-row flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
                   <Link
                     to={`/equipe/${m.id}`}
                     className="btn-action text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md font-medium text-center"
@@ -192,15 +220,20 @@ export default function Membres() {
                     Voir profil
                   </Link>
 
-                  {/* Boutons Promouvoir et Supprimer affichés de force */}
+                  {/* Gestion des rôles et suppression */}
                   {estAdmin && (
                     <>
-                      <button
-                        className="btn-action btn-promote text-xs bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 px-3 py-1.5 rounded-md font-medium hover:bg-sky-100"
-                        onClick={() => handlePromouvoir(m.id, m.role)}
+                      <select
+                        className="text-xs p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-medium"
+                        value={m.role || "Membre"}
+                        onChange={(e) => handleChangerRole(m.id, e.target.value)}
                       >
-                        {m.role === "Admin" ? "Rétrograder" : "Promouvoir"}
-                      </button>
+                        <option value="Membre">Membre</option>
+                        <option value="Sous-chef de Projet">Sous-chef de Projet</option>
+                        <option value="Chef de Projet">Chef de Projet</option>
+                        <option value="Administrateur">Administrateur</option>
+                      </select>
+
                       <button
                         className="btn-action btn-delete text-xs bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-md font-medium hover:bg-red-100 ml-auto"
                         onClick={() => handleSupprimer(m.id)}

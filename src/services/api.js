@@ -1,60 +1,49 @@
-const BASE_URL = "https://teammanager-fl0y.onrender.com";
+// URL de votre backend hébergé sur Render
+export const API_URL = import.meta.env.VITE_API_URL || "https://teammanager-fl0y.onrender.com";
 
-// Helper interne pour récupérer les headers d'authentification HTTP
-const getAuthHeaders = () => {
-  const token = sessionStorage.getItem("token");
+/**
+ * Helper pour obtenir les headers avec le Token JWT
+ */
+function getHeaders() {
+  const token = sessionStorage.getItem("token") || localStorage.getItem("token");
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-};
-
-// Fonction centralisée d'exécution des requêtes HTTP
-async function request(endpoint, options = {}) {
-  const config = {
-    ...options,
-    headers: {
-      ...getAuthHeaders(),
-      ...options.headers,
-    },
-  };
-
-  const response = await fetch(`${BASE_URL}${endpoint}`, config);
-
-  if (response.status === 401) {
-    sessionStorage.removeItem("token");
-    window.location.href = "/connexion";
-    throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
-  }
-
-  if (!response.ok) {
-    let errorMessage = "Une erreur est survenue lors de la requête.";
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.detail || errorMessage;
-    } catch (_) {}
-    throw new Error(errorMessage);
-  }
-
-  if (response.status === 204) return null;
-
-  return response.json();
 }
 
-/* ================= AUTHENTIFICATION ================= */
+async function lireReponse(reponse, messageErreur) {
+  const texte = await reponse.text();
+  let data = null;
 
-export const inscrireUtilisateur = (donnees) =>
-  request("/register", {
-    method: "POST",
-    body: JSON.stringify(donnees),
-  });
+  if (texte) {
+    try {
+      data = JSON.parse(texte);
+    } catch {
+      if (reponse.ok) {
+        throw new Error("Le serveur a renvoyé une réponse invalide.");
+      }
+      data = { detail: texte };
+    }
+  }
 
-export const seConnecter = async (email, password) => {
+  if (!reponse.ok) {
+    throw new Error(data?.detail || messageErreur);
+  }
+
+  return data;
+}
+
+// ================= AUTHENTIFICATION & PROFIL =================
+
+export async function seConnecter({ email, password, motDePasse }) {
+  const pass = password || motDePasse;
+
   const formData = new URLSearchParams();
   formData.append("username", email);
-  formData.append("password", password);
+  formData.append("password", pass);
 
-  const response = await fetch(`${BASE_URL}/login`, {
+  const reponse = await fetch(`${API_URL}/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -62,94 +51,153 @@ export const seConnecter = async (email, password) => {
     body: formData,
   });
 
-  if (!response.ok) {
-    let errorMessage = "Identifiants incorrects.";
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.detail || errorMessage;
-    } catch (_) {}
-    throw new Error(errorMessage);
-  }
+  const data = await lireReponse(reponse, "Email ou mot de passe incorrect.");
 
-  const data = await response.json();
   sessionStorage.setItem("token", data.access_token);
-  return data;
-};
+  localStorage.setItem("token", data.access_token);
 
-/* ================= PROFIL CONNECTÉ ================= */
+  const user = await obtenirProfil();
+  sessionStorage.setItem("user", JSON.stringify(user));
+  localStorage.setItem("user", JSON.stringify(user));
 
-export const getMonProfil = () => request("/me");
+  return { token: data.access_token, utilisateur: user };
+}
 
-/* ================= UTILISATEURS ================= */
+export async function inscrireUtilisateur({ nom, email, password, motDePasse }) {
+  const pass = password || motDePasse;
 
-export const getUtilisateurs = () => request("/utilisateurs/");
-
-export const ajouterUtilisateur = (donneesMembre) =>
-  request("/utilisateurs/", {
+  const reponse = await fetch(`${API_URL}/register`, {
     method: "POST",
-    body: JSON.stringify(donneesMembre),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nom, email, password: pass }),
   });
 
-export const modifierRoleUtilisateur = (id, role) =>
-  request(`/utilisateurs/${id}`, {
+  await lireReponse(reponse, "Erreur lors de l'inscription.");
+
+  return await seConnecter({ email, password: pass });
+}
+
+export async function obtenirProfil() {
+  const reponse = await fetch(`${API_URL}/me`, {
+    headers: getHeaders(),
+  });
+
+  return await lireReponse(reponse, "Impossible de récupérer le profil.");
+}
+
+export async function modifierProfil(donnees) {
+  const reponse = await fetch(`${API_URL}/me`, {
     method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify(donnees),
+  });
+  return await lireReponse(reponse, "Impossible de modifier le profil.");
+}
+
+export async function modifierMotDePasseUtilisateur(donnees) {
+  const reponse = await fetch(`${API_URL}/me/password`, {
+    method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify(donnees),
+  });
+  return await lireReponse(reponse, "Impossible de modifier le mot de passe.");
+}
+
+// ================= UTILISATEURS / MEMBRES =================
+
+export async function getUtilisateurs() {
+  const reponse = await fetch(`${API_URL}/utilisateurs/`, {
+    headers: getHeaders(),
+  });
+  return await lireReponse(reponse, "Impossible de récupérer les utilisateurs.");
+}
+
+export async function ajouterUtilisateur(user) {
+  const reponse = await fetch(`${API_URL}/utilisateurs/`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(user),
+  });
+  return await lireReponse(reponse, "Impossible d'ajouter cet utilisateur.");
+}
+
+export async function modifierRoleUtilisateur(userId, role) {
+  const reponse = await fetch(`${API_URL}/utilisateurs/${userId}`, {
+    method: "PUT",
+    headers: getHeaders(),
     body: JSON.stringify({ role }),
   });
+  return await lireReponse(reponse, "Impossible de modifier le rôle.");
+}
 
-export const supprimerUtilisateur = (id) =>
-  request(`/utilisateurs/${id}`, {
+export async function supprimerUtilisateur(userId) {
+  const reponse = await fetch(`${API_URL}/utilisateurs/${userId}`, {
     method: "DELETE",
+    headers: getHeaders(),
   });
+  await lireReponse(reponse, "Impossible de supprimer cet utilisateur.");
+  return true;
+}
 
-/* ================= PROJETS ================= */
+// ================= PROJETS =================
 
-export const getProjets = () => request("/projets/");
+export async function getProjets() {
+  const reponse = await fetch(`${API_URL}/projets/`, {
+    headers: getHeaders(),
+  });
+  return await lireReponse(reponse, "Impossible de récupérer les projets.");
+}
 
-export const ajouterProjet = (donnees) =>
-  request("/projets/", {
+export async function ajouterProjet(projet) {
+  const reponse = await fetch(`${API_URL}/projets/`, {
     method: "POST",
-    body: JSON.stringify(donnees),
+    headers: getHeaders(),
+    body: JSON.stringify(projet),
   });
+  return await lireReponse(reponse, "Impossible de créer le projet.");
+}
 
-export const modifierProjet = (id, donnees) =>
-  request(`/projets/${id}`, {
+export async function modifierProjet(projetId, projet) {
+  const reponse = await fetch(`${API_URL}/projets/${projetId}`, {
     method: "PUT",
-    body: JSON.stringify(donnees),
+    headers: getHeaders(),
+    body: JSON.stringify(projet),
   });
+  return await lireReponse(reponse, "Impossible de modifier le projet.");
+}
 
-export const supprimerProjet = (id) =>
-  request(`/projets/${id}`, {
+export async function supprimerProjet(projetId) {
+  const reponse = await fetch(`${API_URL}/projets/${projetId}`, {
     method: "DELETE",
+    headers: getHeaders(),
   });
+  await lireReponse(reponse, "Impossible de supprimer le projet.");
+  return true;
+}
 
-/* ================= ESPACE DE PARTAGE / DISCUSSION ================= */
+// ================= ESPACE DE PARTAGE =================
 
-export const getMessagesPartage = () => request("/partage/");
+export async function getMessagesPartage() {
+  const reponse = await fetch(`${API_URL}/partage/`, {
+    headers: getHeaders(),
+  });
+  return await lireReponse(reponse, "Impossible de récupérer les messages.");
+}
 
-export const ajouterMessagePartage = (donnees) =>
-  request("/partage/", {
+export async function publierMessagePartage(contenu) {
+  const reponse = await fetch(`${API_URL}/partage/`, {
     method: "POST",
-    body: JSON.stringify(donnees),
+    headers: getHeaders(),
+    body: JSON.stringify({ contenu }),
   });
+  return await lireReponse(reponse, "Impossible de publier le message.");
+}
 
-export const supprimerMessagePartage = (id) =>
-  request(`/partage/${id}`, {
+export async function supprimerMessagePartage(messageId) {
+  const reponse = await fetch(`${API_URL}/partage/${messageId}`, {
     method: "DELETE",
+    headers: getHeaders(),
   });
-
-/* ================= MODIFICATION PROFIL PERSO ================= */
-
-export const modifierMonNom = (nom) =>
-  request("/me/nom", {
-    method: "PUT",
-    body: JSON.stringify({ nom }),
-  });
-
-export const modifierMonMotDePasse = (ancienMotDePasse, nouveauMotDePasse) =>
-  request("/me/mot-de-passe", {
-    method: "PUT",
-    body: JSON.stringify({
-      ancien_mot_de_passe: ancienMotDePasse,
-      nouveau_mot_de_passe: nouveauMotDePasse,
-    }),
-  });
+  await lireReponse(reponse, "Impossible de supprimer le message.");
+  return true;
+}

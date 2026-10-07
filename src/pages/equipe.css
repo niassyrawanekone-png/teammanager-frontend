@@ -3,14 +3,14 @@
   margin: 0 auto;
   padding: 24px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #333;
+  color: #3e2beb;
 }
 
 .title {
   font-size: 24px;
   font-weight: bold;
   margin-bottom: 20px;
-  color: #1e293b;
+  color: #1428dd;
 }
 
 /* Formulaire encadré */
@@ -87,7 +87,7 @@
 .member-name {
   font-weight: 700;
   font-size: 16px;
-  color: #0f172a;
+  color: #435d99;
 }
 
 .badge {
@@ -104,12 +104,12 @@
 
 .badge-membre {
   background-color: #f1f5f9;
-  color: #475569;
+  color: #5daebd;
 }
 
 .member-email {
   font-size: 13px;
-  color: #64748b;
+  color: #f8feff;
   margin-bottom: 16px;
   word-break: break-all;
 }
@@ -137,7 +137,7 @@
 }
 
 .btn-promote:hover {
-  background-color: #e2e8f0;
+  background-color: #967ae2;
 }
 
 .btn-delete {

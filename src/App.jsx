@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -39,7 +39,11 @@ function App() {
               {/* Routes Publiques */}
               <Route path="/" element={<Accueil />} />
               <Route path="/connexion" element={<Connexion />} />
+              <Route path="/inscription" element={<Inscription />} />
               <Route path="/apropos" element={<APropos />} />
+
+              {/* Redirection si quelqu'un cherche /partage vers /espace-partage */}
+              <Route path="/partage" element={<Navigate to="/espace-partage" replace />} />
 
               {/* Routes Protégées */}
               <Route
@@ -82,14 +86,6 @@ function App() {
                 }
               />
               <Route
-                path="/inscription"
-                element={
-                  <ProtectedRoute>
-                    <Inscription />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/espace-partage"
                 element={
                   <ProtectedRoute>
@@ -97,14 +93,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/Inscription"
-                element={
-                  <ProtectedRoute>
-                    <Inscription />
-                  </ProtectedRoute>
-                }
-              />  
+
               {/* Route Fallback */}
               <Route path="*" element={<Page404 />} />
             </Routes>

@@ -4,12 +4,11 @@ import { useAuth } from "../context/AuthContext";
 
 function Navbar() {
   const [menuOuvert, setMenuOuvert] = useState(false);
-  const { user, setUser } = useAuth();
+  const { estConnecte, seDeconnecter } = useAuth();
   const navigate = useNavigate();
 
-  const handleDeconnexion = () => {
-    sessionStorage.clear();
-    if (setUser) setUser(null);
+  const handleDeconnexionClick = () => {
+    seDeconnecter();
     setMenuOuvert(false);
     navigate("/connexion");
   };
@@ -48,7 +47,7 @@ function Navbar() {
             </NavLink>
             
             {/* Lien Discussion & Chat visible si connecté */}
-            {user && (
+            {estConnecte && (
               <NavLink to="/espace-partage" className={navLinkStyle}>
                 💬 Discussion & Chat
               </NavLink>
@@ -62,16 +61,16 @@ function Navbar() {
             </NavLink>
 
             {/* Lien Mon Profil visible uniquement si connecté */}
-            {user && (
+            {estConnecte && (
               <NavLink to="/profil" className={navLinkStyle}>
                 Mon Profil
               </NavLink>
             )}
 
             {/* Connexion / Déconnexion */}
-            {user ? (
+            {estConnecte ? (
               <button
-                onClick={handleDeconnexion}
+                onClick={handleDeconnexionClick}
                 className="text-sm font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 transition-colors"
               >
                 Déconnexion
@@ -116,7 +115,7 @@ function Navbar() {
             Projets
           </NavLink>
 
-          {user && (
+          {estConnecte && (
             <NavLink to="/espace-partage" className={mobileNavLinkStyle} onClick={() => setMenuOuvert(false)}>
               💬 Discussion & Chat
             </NavLink>
@@ -129,15 +128,15 @@ function Navbar() {
             À Propos
           </NavLink>
 
-          {user && (
+          {estConnecte && (
             <NavLink to="/profil" className={mobileNavLinkStyle} onClick={() => setMenuOuvert(false)}>
               Mon Profil
             </NavLink>
           )}
 
-          {user ? (
+          {estConnecte ? (
             <button
-              onClick={handleDeconnexion}
+              onClick={handleDeconnexionClick}
               className="w-full text-left py-2 px-3 text-base font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"
             >
               Déconnexion

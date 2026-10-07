@@ -1,125 +1,129 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { inscrireUtilisateur } from "../services/api";
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { inscrireUtilisateur } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function Inscription() {
-  const [nom, setNom] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [erreur, setErreur] = useState("");
-  const [succes, setSucces] = useState("");
+  const [nom, setNom] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [erreur, setErreur] = useState('');
   const [chargement, setChargement] = useState(false);
-
   const navigate = useNavigate();
+  const { seConnecter } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErreur("");
-    setSucces("");
     setChargement(true);
+    setErreur('');
 
     try {
-      await inscrireUtilisateur({
-        nom: nom.trim(),
-        email: email.trim(),
-        password: password,
-      });
-
-      setSucces("Inscription réussie ! Redirection vers la connexion...");
-      setTimeout(() => {
-        navigate("/connexion");
-      }, 1500);
+      // Appel à la fonction d'inscription de votre fichier api.js
+      const reponse = await inscrireUtilisateur({ nom, email, password });
+      await seConnecter(reponse.utilisateur, reponse.token);
+      navigate('/');
     } catch (err) {
-      setErreur(err.message || "Erreur lors de l'inscription.");
+      console.error(err);
+      if (err.message && err.message.includes('fetch')) {
+        setErreur("Échec de la récupération : Impossible de contacter le serveur backend.");
+      } else {
+        setErreur(err.message || "Erreur lors de l'inscription.");
+      }
     } finally {
       setChargement(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-            Rejoindre ⚡ TeamManager
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            Créez votre compte pour commencer à collaborer.
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+
+        <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-6">
+          Créer un compte
+        </h2>
+
+        {/* BANNIÈRE BLEUE D'INFORMATION */}
+        <div className="mb-5 p-4 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-xl flex items-start gap-3">
+          <span className="text-xl">ℹ️</span>
+          <div className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
+            <p className="font-bold text-sm mb-1">Puisque c'est votre première fois :</p>
+            <p>
+              Utilisez le mot de passe par défaut :{" "}
+              <strong className="bg-blue-200 dark:bg-blue-800 px-2 py-0.5 rounded text-blue-900 dark:text-white font-mono text-sm">
+                123456
+              </strong>
+            </p>
+          </div>
         </div>
 
+        {/* Affichage d'erreur */}
         {erreur && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-xl text-sm border border-red-200">
-            {erreur}
+          <div className="mb-5 p-3.5 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-xs font-medium">
+            ⚠️ {erreur}
           </div>
         )}
 
-        {succes && (
-          <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-xl text-sm border border-green-200">
-            {succes}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Formulaire */}
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
               Nom complet
             </label>
             <input
               type="text"
               required
-              placeholder="Ex: Rawane Koné Niassy"
-              className="w-full p-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition"
               value={nom}
               onChange={(e) => setNom(e.target.value)}
+              placeholder="Ex: Rawane Koné Niassy"
+              className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Adresse E-mail
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              Adresse e-mail
             </label>
             <input
               type="email"
               required
-              placeholder="exemple@domaine.com"
-              className="w-full p-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="niassyrawanekone@gmail.com"
+              className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
               Mot de passe
             </label>
             <input
               type="password"
               required
-              placeholder="••••••••"
-              className="w-full p-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <button
             type="submit"
             disabled={chargement}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition duration-200 shadow-md disabled:opacity-50"
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all shadow-md text-sm disabled:opacity-60"
           >
-            {chargement ? "Création du compte..." : "S'inscrire"}
+            {chargement ? "Patientez..." : "S'inscrire"}
           </button>
-
-          
         </form>
 
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
-          Vous avez déjà un compte ?{" "}
-          <Link to="/connexion" className="text-teal-600 dark:text-teal-400 font-bold hover:underline">
+        {/* Lien de redirection vers la connexion */}
+        <div className="mt-6 text-center text-xs text-gray-600 dark:text-gray-400">
+          Déjà un compte ?{" "}
+          <Link to="/connexion" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">
             Se connecter
           </Link>
-        </p>
+        </div>
+
       </div>
     </div>
   );

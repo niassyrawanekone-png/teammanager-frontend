@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getProjets, getMessagesPartage } from "../services/api";
 
@@ -9,21 +9,28 @@ export default function Accueil() {
 
   const [projetsCount, setProjetsCount] = useState(0);
   const [dernierMessage, setDernierMessage] = useState(null);
-  const [chargement, setChargement] = useState(false);
+  const [chargement, setChargement] = useState(Boolean(token));
 
   useEffect(() => {
-    if (token) {
-      setChargement(true);
-      Promise.all([getProjets(), getMessagesPartage()])
-        .then(([projetsData, messagesData]) => {
-          if (Array.isArray(projetsData)) setProjetsCount(projetsData.length);
-          if (Array.isArray(messagesData) && messagesData.length > 0) {
-            setDernierMessage(messagesData[0]);
-          }
-        })
-        .catch((err) => console.error("Erreur lors de la récupération des données :", err))
-        .finally(() => setChargement(false));
-    }
+    if (!token) return;
+
+    let actif = true;
+    Promise.all([getProjets(), getMessagesPartage()])
+      .then(([projetsData, messagesData]) => {
+        if (!actif) return;
+        if (Array.isArray(projetsData)) setProjetsCount(projetsData.length);
+        if (Array.isArray(messagesData) && messagesData.length > 0) {
+          setDernierMessage(messagesData[0]);
+        }
+      })
+      .catch((err) => console.error("Erreur lors de la récupération des données :", err))
+      .finally(() => {
+        if (actif) setChargement(false);
+      });
+
+    return () => {
+      actif = false;
+    };
   }, [token]);
 
   // ================= 1. PAGE D'ACCUEIL POUR VISITEUR NON CONNECTÉ =================
