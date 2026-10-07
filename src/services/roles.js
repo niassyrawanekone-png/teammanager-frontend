@@ -30,13 +30,10 @@ export function getRoleDisplayName(role) {
   }
 }
 
-// Verification de la regle de suppression de message :
-// Un role superieur peut supprimer le message d'un role inferieur ou le sien
-export function peutSupprimerMessage(userRole, authorRole, userId, authorId) {
-  if (userId && authorId && userId === authorId) return true; // On peut supprimer son propre message
-  const userLevel = ROLE_HIERARCHY[normalizeRole(userRole)] || 1;
-  const authorLevel = ROLE_HIERARCHY[normalizeRole(authorRole)] || 1;
-  return userLevel > authorLevel;
+// Le backend autorise la suppression des messages aux administrateurs uniquement.
+export function peutSupprimerMessage(userRole) {
+  const role = userRole?.toString().trim();
+  return role === "Admin" || role === "SUPER_ADMIN";
 }
 
 // Styles de couleur des bulles du chat (Compatible Mode Clair & Sombre)

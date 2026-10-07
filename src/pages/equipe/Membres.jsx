@@ -15,7 +15,6 @@ export default function Membres() {
   const [membres, setMembres] = useState([]);
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("Membre");
   const [recherche, setRecherche] = useState("");
   const [chargement, setChargement] = useState(true);
   const [notification, setNotification] = useState({ message: "", type: "success" });
@@ -77,18 +76,12 @@ export default function Membres() {
     if (!nom.trim() || !email.trim()) return;
 
     try {
-      await ajouterUtilisateur({
-        nom: nom.trim(),
-        email: email.trim(),
-        motDePasse: "123456",
-        role: role,
-      });
+      await ajouterUtilisateur({ nom: nom.trim(), email: email.trim(), password: "123456" });
 
       setNom("");
       setEmail("");
-      setRole("Membre");
       await chargerMembres();
-      afficherToast("Membre ajouté avec succès ! (Mot de passe par défaut : 123456)", "success");
+      afficherToast("Membre ajouté avec succès. Son rôle initial est Membre.", "success");
     } catch (err) {
       afficherToast(err.message || "Erreur lors de l'ajout du membre.", "error");
     }
@@ -150,17 +143,6 @@ export default function Membres() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <select
-              className="form-select p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-medium"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              required
-            >
-              <option value="Membre">Membre</option>
-              <option value="Sous-chef de Projet">Sous-chef de Projet</option>
-              <option value="Chef de Projet">Chef de Projet</option>
-              <option value="Administrateur">Administrateur</option>
-            </select>
             <button type="submit" className="btn-add bg-teal-600 hover:bg-teal-700 text-white font-bold px-5 py-2.5 rounded-lg transition">
               Ajouter
             </button>
@@ -225,13 +207,13 @@ export default function Membres() {
                     <>
                       <select
                         className="text-xs p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-medium"
-                        value={m.role || "Membre"}
+                        value={normalizeRole(m.role) === "ADMIN" ? "Admin" : (m.role || "Membre")}
                         onChange={(e) => handleChangerRole(m.id, e.target.value)}
                       >
                         <option value="Membre">Membre</option>
                         <option value="Sous-chef de Projet">Sous-chef de Projet</option>
                         <option value="Chef de Projet">Chef de Projet</option>
-                        <option value="Administrateur">Administrateur</option>
+                        <option value="Admin">Administrateur</option>
                       </select>
 
                       <button

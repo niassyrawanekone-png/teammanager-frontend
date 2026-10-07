@@ -24,15 +24,15 @@ export default function Profil() {
 
   const handleChangerMotDePasse = async (e) => {
     e.preventDefault();
-    if (!nouveauMdp.trim()) return;
-
-    if (ancienMdp && user.motDePasse && ancienMdp !== user.motDePasse) {
-      afficherToast("L'ancien mot de passe est incorrect.", "error");
+    if (!ancienMdp.trim() || !nouveauMdp.trim()) {
       return;
     }
 
     try {
-      await modifierMotDePasseUtilisateur(user.id, nouveauMdp);
+      await modifierMotDePasseUtilisateur({
+        ancienMotDePasse: ancienMdp,
+        nouveauMotDePasse: nouveauMdp,
+      });
       setAncienMdp("");
       setNouveauMdp("");
       afficherToast("Mot de passe modifié avec succès !", "success");
@@ -108,11 +108,26 @@ export default function Profil() {
           <form onSubmit={handleChangerMotDePasse} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                Mot de passe actuel
+              </label>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="Entrez votre mot de passe actuel"
+                className="w-full p-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                value={ancienMdp}
+                onChange={(e) => setAncienMdp(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
                 Nouveau mot de passe
               </label>
               <input
                 type="password"
                 required
+                autoComplete="new-password"
                 placeholder="Entrez votre nouveau mot de passe"
                 className="w-full p-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                 value={nouveauMdp}

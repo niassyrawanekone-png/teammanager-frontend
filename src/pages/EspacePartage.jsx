@@ -294,10 +294,7 @@ export default function EspacePartage() {
             filteredMessages.map((msg) => {
               const isMe = msg.senderId === currentUser?.id;
               const canDelete = peutSupprimerMessage(
-                currentUser?.role,
-                msg.senderRole,
-                currentUser?.id,
-                msg.senderId
+                currentUser?.role
               );
 
               return (

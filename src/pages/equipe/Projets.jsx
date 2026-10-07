@@ -18,8 +18,6 @@ export default function Projets() {
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [chefId, setChefId] = useState("");
-  const [sousChefId, setSousChefId] = useState("");
-  const [membresSelectionnes, setMembresSelectionnes] = useState([]);
   const [statut, setStatut] = useState("En cours");
 
   const [notification, setNotification] = useState({ message: "", type: "success" });
@@ -78,33 +76,22 @@ export default function Projets() {
     };
   }, []);
 
-  const handleToggleMembre = (userId) => {
-    if (membresSelectionnes.includes(userId)) {
-      setMembresSelectionnes(membresSelectionnes.filter((id) => id !== userId));
-    } else {
-      setMembresSelectionnes([...membresSelectionnes, userId]);
-    }
-  };
-
   const handleCreerProjet = async (e) => {
     e.preventDefault();
     if (!titre.trim()) return;
 
     try {
+      const responsable = utilisateurs.find((utilisateur) => utilisateur.id === Number(chefId));
       await ajouterProjet({
         titre: titre.trim(),
-        description: description,
-        chef_id: chefId || userActuel?.id,
-        sous_chef_id: sousChefId,
-        membres_ids: membresSelectionnes,
+        description,
+        responsable: responsable?.nom || responsable?.email || userActuel?.nom || userActuel?.email || "Non assigné",
         statut,
       });
 
       setTitre("");
       setDescription("");
       setChefId("");
-      setSousChefId("");
-      setMembresSelectionnes([]);
       setStatut("En cours");
 
       await chargerDonnees();
@@ -116,7 +103,14 @@ export default function Projets() {
 
   const handleChangerStatut = async (id, nouveauStatut) => {
     try {
-      await modifierProjet(id, { statut: nouveauStatut });
+      const projet = projets.find((item) => item.id === id);
+      if (!projet) throw new Error("Projet introuvable.");
+      await modifierProjet(id, {
+        titre: projet.titre,
+        description: projet.description || "",
+        statut: nouveauStatut,
+        responsable: projet.responsable || "Non assigné",
+      });
       await chargerDonnees();
       setNotification({ message: "Statut mis à jour.", type: "success" });
     } catch (err) {
@@ -133,11 +127,6 @@ export default function Projets() {
     } catch (err) {
       setNotification({ message: err.message || "Erreur de suppression.", type: "error" });
     }
-  };
-
-  const getUserName = (id) => {
-    const user = utilisateurs.find((u) => u.id === id);
-    return user ? user.nom : "Non assigné";
   };
 
   return (
@@ -214,51 +203,11 @@ export default function Projets() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
-                  Sous-chef de projet
-                </label>
-                <select
-                  className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm"
-                  value={sousChefId}
-                  onChange={(e) => setSousChefId(e.target.value)}
-                >
-                  <option value="">-- Choisir le sous-chef --</option>
-                  {utilisateurs.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nom} ({u.role || "Membre"})
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
 
-            {/* Sélection des membres du projet */}
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2">
-                Sélectionner les membres participants ({membresSelectionnes.length})
-              </label>
-              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
-                {utilisateurs.map((u) => {
-                  const estCoche = membresSelectionnes.includes(u.id);
-                  return (
-                    <button
-                      type="button"
-                      key={u.id}
-                      onClick={() => handleToggleMembre(u.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        estCoche
-                          ? "bg-blue-600 text-white"
-                          : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-                      }`}
-                    >
-                      {estCoche ? "✓ " : "+ "}
-                      {u.nom}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Le backend enregistre un responsable unique par projet. La gestion des sous-chefs et des membres nécessite une évolution de son schéma.
+            </p>
 
             <div className="flex justify-between items-center pt-2">
               <select
@@ -321,16 +270,8 @@ export default function Projets() {
 
                 <div className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
                   <p>
-                    👑 <strong className="text-gray-700 dark:text-gray-300">Chef :</strong>{" "}
-                    {getUserName(p.chef_id)}
-                  </p>
-                  <p>
-                    🥈 <strong className="text-gray-700 dark:text-gray-300">Sous-Chef :</strong>{" "}
-                    {getUserName(p.sous_chef_id)}
-                  </p>
-                  <p>
-                    👥 <strong className="text-gray-700 dark:text-gray-300">Membres ({p.membres_ids?.length || 0}) :</strong>{" "}
-                    {p.membres_ids?.map((id) => getUserName(id)).join(", ") || "Aucun membre"}
+                    👑 <strong className="text-gray-700 dark:text-gray-300">Responsable :</strong>{" "}
+                    {p.responsable || "Non assigné"}
                   </p>
                 </div>
               </div>

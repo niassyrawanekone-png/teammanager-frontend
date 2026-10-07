@@ -42,20 +42,6 @@ export default function Inscription() {
           Créer un compte
         </h2>
 
-        {/* BANNIÈRE BLEUE D'INFORMATION */}
-        <div className="mb-5 p-4 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-xl flex items-start gap-3">
-          <span className="text-xl">ℹ️</span>
-          <div className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
-            <p className="font-bold text-sm mb-1">Puisque c'est votre première fois :</p>
-            <p>
-              Utilisez le mot de passe par défaut :{" "}
-              <strong className="bg-blue-200 dark:bg-blue-800 px-2 py-0.5 rounded text-blue-900 dark:text-white font-mono text-sm">
-                123456
-              </strong>
-            </p>
-          </div>
-        </div>
-
         {/* Affichage d'erreur */}
         {erreur && (
           <div className="mb-5 p-3.5 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-xs font-medium">

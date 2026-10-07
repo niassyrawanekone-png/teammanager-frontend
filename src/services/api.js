@@ -28,7 +28,14 @@ async function lireReponse(reponse, messageErreur) {
   }
 
   if (!reponse.ok) {
-    throw new Error(data?.detail || messageErreur);
+    const detail = data?.detail;
+    const message = Array.isArray(detail)
+      ? detail.map((erreur) => {
+          const champ = Array.isArray(erreur.loc) ? erreur.loc.slice(1).join(".") : "";
+          return champ ? `${champ}: ${erreur.msg}` : erreur.msg;
+        }).join(" ")
+      : detail;
+    throw new Error(message || messageErreur);
   }
 
   return data;
@@ -89,16 +96,19 @@ export async function modifierProfil(donnees) {
   const reponse = await fetch(`${API_URL}/me`, {
     method: "PUT",
     headers: getHeaders(),
-    body: JSON.stringify(donnees),
+    body: JSON.stringify({ nom: donnees.nom }),
   });
   return await lireReponse(reponse, "Impossible de modifier le profil.");
 }
 
-export async function modifierMotDePasseUtilisateur(donnees) {
-  const reponse = await fetch(`${API_URL}/me/password`, {
+export async function modifierMotDePasseUtilisateur({ ancienMotDePasse, nouveauMotDePasse }) {
+  const reponse = await fetch(`${API_URL}/me/mot-de-passe`, {
     method: "PUT",
     headers: getHeaders(),
-    body: JSON.stringify(donnees),
+    body: JSON.stringify({
+      ancien_mot_de_passe: ancienMotDePasse,
+      nouveau_mot_de_passe: nouveauMotDePasse,
+    }),
   });
   return await lireReponse(reponse, "Impossible de modifier le mot de passe.");
 }
@@ -112,11 +122,11 @@ export async function getUtilisateurs() {
   return await lireReponse(reponse, "Impossible de récupérer les utilisateurs.");
 }
 
-export async function ajouterUtilisateur(user) {
+export async function ajouterUtilisateur({ nom, email, password, motDePasse }) {
   const reponse = await fetch(`${API_URL}/utilisateurs/`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify(user),
+    body: JSON.stringify({ nom, email, password: password || motDePasse }),
   });
   return await lireReponse(reponse, "Impossible d'ajouter cet utilisateur.");
 }
