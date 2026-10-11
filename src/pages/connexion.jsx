@@ -83,6 +83,9 @@ export default function Connexion() {
               placeholder="••••••••"
               className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <Link to="/mot-de-passe-oublie" className="mt-2 inline-block text-xs font-semibold text-blue-700 hover:underline dark:text-blue-300">
+              Mot de passe oublié ?
+            </Link>
           </div>
 
           <button

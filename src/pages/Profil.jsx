@@ -5,8 +5,10 @@ import Toast from "../components/Toast";
 
 export default function Profil() {
   const { utilisateurConnecte } = useAuth();
+  const { seConnecter } = useAuth();
   const [ancienMdp, setAncienMdp] = useState("");
   const [nouveauMdp, setNouveauMdp] = useState("");
+  const [confirmationMdp, setConfirmationMdp] = useState("");
   const [notification, setNotification] = useState({ message: "", type: "success" });
 
   const storedUser = JSON.parse(
@@ -27,14 +29,20 @@ export default function Profil() {
     if (!ancienMdp.trim() || !nouveauMdp.trim()) {
       return;
     }
+    if (nouveauMdp !== confirmationMdp) {
+      afficherToast("Les deux nouveaux mots de passe ne correspondent pas.", "error");
+      return;
+    }
 
     try {
-      await modifierMotDePasseUtilisateur({
+      const result = await modifierMotDePasseUtilisateur({
         ancienMotDePasse: ancienMdp,
         nouveauMotDePasse: nouveauMdp,
       });
+      if (result?.access_token && user) await seConnecter(user, result.access_token);
       setAncienMdp("");
       setNouveauMdp("");
+      setConfirmationMdp("");
       afficherToast("Mot de passe modifié avec succès !", "success");
     } catch (err) {
       afficherToast(err.message || "Erreur lors de la modification du mot de passe.", "error");
@@ -127,11 +135,26 @@ export default function Profil() {
               <input
                 type="password"
                 required
+                minLength={8}
                 autoComplete="new-password"
                 placeholder="Entrez votre nouveau mot de passe"
                 className="w-full p-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                 value={nouveauMdp}
                 onChange={(e) => setNouveauMdp(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                Confirmer le nouveau mot de passe
+              </label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="w-full p-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                value={confirmationMdp}
+                onChange={(e) => setConfirmationMdp(e.target.value)}
               />
             </div>
             <button

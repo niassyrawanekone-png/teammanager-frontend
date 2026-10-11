@@ -1,13 +1,101 @@
 @import "tailwindcss";
 
-/* Indique à Tailwind v4 d'utiliser la classe .dark sur n'importe quel parent */
 @variant dark (&:where(.dark, .dark *));
 
-body {
-  @apply bg-gray-50 text-gray-900 transition-colors duration-200;
+:root {
+  color-scheme: light;
+  --tm-bg: #f4f7fb;
+  --tm-surface: #ffffff;
+  --tm-surface-muted: #f8fafc;
+  --tm-text: #172033;
+  --tm-text-muted: #64748b;
+  --tm-border: #e2e8f0;
+  --tm-primary: #2563eb;
+  --tm-primary-hover: #1d4ed8;
+  --tm-danger: #dc2626;
+  --tm-success: #15803d;
+  --tm-radius: 1rem;
+  --tm-shadow: 0 12px 32px rgb(15 23 42 / 0.08);
 }
 
-/* Fond global pour tout l'écran en mode sombre */
-html.dark body {
-  @apply bg-gray-900 text-gray-100;
+html.dark {
+  color-scheme: dark;
+  --tm-bg: #0b1220;
+  --tm-surface: #111c2e;
+  --tm-surface-muted: #162338;
+  --tm-text: #e5edf8;
+  --tm-text-muted: #9aa9bd;
+  --tm-border: #26364e;
+  --tm-primary: #60a5fa;
+  --tm-primary-hover: #3b82f6;
+  --tm-danger: #f87171;
+  --tm-success: #4ade80;
+  --tm-shadow: 0 14px 36px rgb(0 0 0 / 0.24);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--tm-bg);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: var(--tm-bg);
+  color: var(--tm-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  color: var(--tm-text);
+}
+
+select option {
+  background: var(--tm-surface);
+  color: var(--tm-text);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--tm-primary) 65%, transparent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--tm-primary) 22%, transparent);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

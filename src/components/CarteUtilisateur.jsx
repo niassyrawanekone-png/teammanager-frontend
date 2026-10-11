@@ -1,4 +1,4 @@
-function CarteUtilisateur({ id, nom, role, email, onSupprimer, onModifierRole }) {
+function CarteUtilisateur({ id, nom, role, email, onSupprimer }) {
   return (
     <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition flex flex-col justify-between text-left">
       <div>
@@ -12,12 +12,6 @@ function CarteUtilisateur({ id, nom, role, email, onSupprimer, onModifierRole })
       </div>
 
       <div className="flex items-center gap-2 pt-3 border-t border-gray-100 mt-2">
-        <button 
-          onClick={() => onModifierRole(id, "Admin")}
-          className="flex-1 py-1.5 px-3 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition"
-        >
-          ⚡ Admin
-        </button>
         <button 
           onClick={() => onSupprimer(id)}
           className="py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition"

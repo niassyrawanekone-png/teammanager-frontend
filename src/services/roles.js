@@ -1,10 +1,10 @@
-// Hierarchie numerique des roles (5 niveaux)
+// Rôles applicatifs. ADMIN reste reconnu uniquement pour lire d'anciennes sessions
+// ou données; il ne peut plus être attribué et est traité comme un rôle membre.
 export const ROLE_HIERARCHY = {
-  SUPER_ADMIN: 5,
-  ADMIN: 4,
+  SUPER_ADMIN: 4,
   CHEF_DE_PROJET: 3,
   SOUS_CHEF_DE_PROJET: 2,
-  MEMBRE: 1
+  MEMBRE: 1,
 };
 
 // Convertit n'importe quel texte de role en cle standardisee
@@ -12,7 +12,7 @@ export function normalizeRole(role) {
   if (!role) return 'MEMBRE';
   const r = role.toString().trim().toUpperCase();
   if (r.includes('SUPER')) return 'SUPER_ADMIN';
-  if (r.includes('ADMIN')) return 'ADMIN';
+  if (r === 'ADMIN' || r === 'ADMINISTRATEUR') return 'MEMBRE';
   if (r.includes('SOUS') || r.includes('SUB')) return 'SOUS_CHEF_DE_PROJET';
   if (r.includes('CHEF')) return 'CHEF_DE_PROJET';
   return 'MEMBRE';
@@ -23,7 +23,6 @@ export function getRoleDisplayName(role) {
   const norm = normalizeRole(role);
   switch (norm) {
     case 'SUPER_ADMIN': return 'Super Administrateur';
-    case 'ADMIN': return 'Administrateur';
     case 'CHEF_DE_PROJET': return 'Chef de Projet';
     case 'SOUS_CHEF_DE_PROJET': return 'Sous-chef de Projet';
     case 'MEMBRE': default: return 'Membre';
@@ -32,8 +31,7 @@ export function getRoleDisplayName(role) {
 
 // Le backend autorise la suppression des messages aux administrateurs uniquement.
 export function peutSupprimerMessage(userRole) {
-  const role = userRole?.toString().trim();
-  return role === "Admin" || role === "SUPER_ADMIN";
+  return normalizeRole(userRole) === "SUPER_ADMIN";
 }
 
 // Styles de couleur des bulles du chat (Compatible Mode Clair & Sombre)
@@ -41,7 +39,6 @@ export function getMessageRoleStyle(role) {
   const norm = normalizeRole(role);
   switch (norm) {
     case 'SUPER_ADMIN':
-    case 'ADMIN':
       // Fond JAUNE
       return 'bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-200 dark:border-yellow-700/50';
     

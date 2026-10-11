@@ -13,20 +13,22 @@ import "../equipe.css";
 
 export default function Membres() {
   const [membres, setMembres] = useState([]);
+  const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState("MEMBRE");
   const [recherche, setRecherche] = useState("");
   const [chargement, setChargement] = useState(true);
   const [notification, setNotification] = useState({ message: "", type: "success" });
 
-  const { utilisateurConnecte, estAdmin: adminDuContexte } = useAuth();
+  const { utilisateurConnecte } = useAuth();
 
   // Récupération sécurisée de l'utilisateur stocké en session pour forcer l'affichage si admin
   const storedUser = JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "{}");
   const roleActuel = utilisateurConnecte?.role || storedUser?.role;
 
   const roleNormalise = normalizeRole(roleActuel);
-  const estAdmin = adminDuContexte || roleNormalise === "ADMIN" || roleNormalise === "SUPER_ADMIN";
+  const estAdmin = roleNormalise === "CHEF_DE_PROJET";
 
   const afficherToast = (message, type = "success") => {
     setNotification({ message, type });
@@ -73,15 +75,17 @@ export default function Membres() {
 
   const handleAjouter = async (e) => {
     e.preventDefault();
-    if (!nom.trim() || !email.trim()) return;
+    if (!prenom.trim() || !nom.trim() || !email.trim()) return;
 
     try {
-      await ajouterUtilisateur({ nom: nom.trim(), email: email.trim(), password: "123456" });
+      await ajouterUtilisateur({ prenom: prenom.trim(), nom: nom.trim(), email: email.trim(), role });
 
+      setPrenom("");
       setNom("");
       setEmail("");
+      setRole("MEMBRE");
       await chargerMembres();
-      afficherToast("Membre ajouté avec succès. Son rôle initial est Membre.", "success");
+      afficherToast("Invitation envoyée par e-mail.", "success");
     } catch (err) {
       afficherToast(err.message || "Erreur lors de l'ajout du membre.", "error");
     }
@@ -98,9 +102,9 @@ export default function Membres() {
     }
   };
 
-  const handleChangerRole = async (id, nouveauRole) => {
+  const handleChangerRole = async (id, nouveauRole, canManageTasks = false) => {
     try {
-      await modifierRoleUtilisateur(id, nouveauRole);
+      await modifierRoleUtilisateur(id, nouveauRole, canManageTasks);
       await chargerMembres();
       afficherToast(`Grade mis à jour : ${nouveauRole}`, "success");
     } catch (err) {
@@ -109,7 +113,7 @@ export default function Membres() {
   };
 
   const membresFiltres = membres.filter((m) =>
-    (m.nom || "").toLowerCase().includes(recherche.toLowerCase()) ||
+    (`${m.prenom || ""} ${m.nom || ""}`).toLowerCase().includes(recherche.toLowerCase()) ||
     (m.email && m.email.toLowerCase().includes(recherche.toLowerCase()))
   );
 
@@ -130,7 +134,15 @@ export default function Membres() {
             <input
               className="form-input p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg flex-1 text-gray-900 dark:text-white"
               type="text"
-              placeholder="Nom du membre"
+              placeholder="Prénom"
+              value={prenom}
+              onChange={(e) => setPrenom(e.target.value)}
+              required
+            />
+            <input
+              className="form-input p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg flex-1 text-gray-900 dark:text-white"
+              type="text"
+              placeholder="Nom"
               value={nom}
               onChange={(e) => setNom(e.target.value)}
               required
@@ -143,6 +155,14 @@ export default function Membres() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+            <select
+              className="form-input p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              <option value="MEMBRE">Membre</option>
+              <option value="SOUS_CHEF_DE_PROJET">Sous-chef de projet</option>
+            </select>
             <button type="submit" className="btn-add bg-teal-600 hover:bg-teal-700 text-white font-bold px-5 py-2.5 rounded-lg transition">
               Ajouter
             </button>
@@ -173,10 +193,10 @@ export default function Membres() {
               <div key={m.id} className="member-card p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl flex flex-col justify-between shadow-sm">
                 <div>
                   <div className="member-header flex justify-between items-center mb-1">
-                    <span className="member-name font-bold text-gray-900 dark:text-white">{m.nom || "Sans nom"}</span>
+                    <span className="member-name font-bold text-gray-900 dark:text-white">{[m.prenom, m.nom].filter(Boolean).join(" ") || "Sans nom"}</span>
                     <span
                       className={`badge px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        normalizeRole(m.role) === "ADMIN" || normalizeRole(m.role) === "SUPER_ADMIN"
+                        normalizeRole(m.role) === "SUPER_ADMIN"
                           ? "badge-admin bg-amber-100 text-amber-800"
                           : normalizeRole(m.role) === "CHEF_DE_PROJET"
                           ? "bg-purple-100 text-purple-800"
@@ -191,6 +211,11 @@ export default function Membres() {
                   <div className="member-email text-xs text-gray-500 dark:text-gray-400">
                     {m.email || "Aucun email renseigné"}
                   </div>
+                  {m.workspace_name && (
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Espace : {m.workspace_name}
+                    </div>
+                  )}
                 </div>
 
                 <div className="actions-row flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
@@ -207,14 +232,19 @@ export default function Membres() {
                     <>
                       <select
                         className="text-xs p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-medium"
-                        value={normalizeRole(m.role) === "ADMIN" ? "Admin" : (m.role || "Membre")}
-                        onChange={(e) => handleChangerRole(m.id, e.target.value)}
+                        value={normalizeRole(m.role) === "SOUS_CHEF_DE_PROJET" ? "SOUS_CHEF_DE_PROJET" : "MEMBRE"}
+                        onChange={(e) => handleChangerRole(m.id, e.target.value, Boolean(m.can_manage_tasks && e.target.value === "SOUS_CHEF_DE_PROJET"))}
                       >
-                        <option value="Membre">Membre</option>
-                        <option value="Sous-chef de Projet">Sous-chef de Projet</option>
-                        <option value="Chef de Projet">Chef de Projet</option>
-                        <option value="Admin">Administrateur</option>
+                        <option value="MEMBRE">Membre</option>
+                        <option value="SOUS_CHEF_DE_PROJET">Sous-chef de Projet</option>
                       </select>
+
+                      {normalizeRole(m.role) === "SOUS_CHEF_DE_PROJET" && (
+                        <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
+                          <input type="checkbox" checked={Boolean(m.can_manage_tasks)} onChange={(e) => handleChangerRole(m.id, "SOUS_CHEF_DE_PROJET", e.target.checked)} />
+                          Gérer les tâches
+                        </label>
+                      )}
 
                       <button
                         className="btn-action btn-delete text-xs bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-md font-medium hover:bg-red-100 ml-auto"

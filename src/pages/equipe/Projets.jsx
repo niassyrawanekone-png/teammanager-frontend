@@ -1,305 +1,202 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  getProjets,
-  ajouterProjet,
-  modifierProjet,
-  supprimerProjet,
-  getUtilisateurs,
+  ajouterProjet, ajouterTache, getProjets, getTaches, getUtilisateurs,
+  modifierEtatTache, modifierProjet, supprimerProjet, supprimerTache,
 } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "../../components/Toast";
 import { normalizeRole } from "../../services/roles";
 
-export default function Projets() {
-  const [projets, setProjets] = useState([]);
-  const [utilisateurs, setUtilisateurs] = useState([]);
+const blankTask = { title: "", description: "", assigned_to: "", due_date: "", priority: "NORMAL" };
+const statusLabels = { TODO: "À faire", IN_PROGRESS: "En cours", DONE: "Terminée" };
 
-  // Champs Formulaire
-  const [titre, setTitre] = useState("");
-  const [description, setDescription] = useState("");
-  const [chefId, setChefId] = useState("");
-  const [statut, setStatut] = useState("En cours");
+function ouvrirExportProjet(project, tasks) {
+  const printWindow = window.open("about:blank", "_blank");
+  if (!printWindow) throw new Error("Autorisez l’ouverture de la fenêtre d’export pour enregistrer le PDF.");
+  printWindow.opener = null;
+  const doc = printWindow.document;
+  doc.open();
+  doc.write("<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><title>Export du projet</title><style>body{font:14px/1.55 system-ui,sans-serif;color:#172033;max-width:850px;margin:40px auto;padding:0 24px}h1{font-size:26px}h2{margin-top:24px;border-bottom:1px solid #dbe2ea;padding-bottom:6px}p{white-space:pre-wrap;overflow-wrap:anywhere}.task{break-inside:avoid;border:1px solid #dbe2ea;border-radius:8px;padding:10px;margin:8px 0}.muted{color:#64748b;font-size:12px}@page{margin:18mm}@media print{body{margin:0;padding:0}}</style></head><body></body></html>");
+  doc.close();
 
-  const [notification, setNotification] = useState({ message: "", type: "success" });
-
-  const { utilisateurConnecte } = useAuth();
-
-  // Récupération de secours depuis la session locale
-  const storedUser = JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "{}");
-  const userActuel = utilisateurConnecte || storedUser;
-  const userRole = normalizeRole(userActuel?.role);
-
-  // Autorise la création aux administrateurs et chefs de projet.
-  const peutCreerProjet =
-    userRole === "SUPER_ADMIN" ||
-    userRole === "ADMIN" ||
-    userRole === "CHEF_DE_PROJET";
-
-  const chargerDonnees = async () => {
-    try {
-      const [projetsData, usersData] = await Promise.all([
-        getProjets(),
-        getUtilisateurs(),
-      ]);
-      setProjets(projetsData || []);
-      setUtilisateurs(usersData || []);
-    } catch (err) {
-      setNotification({ message: err.message || "Erreur de chargement.", type: "error" });
-    }
+  const addText = (tag, text, parent = doc.body, className = "") => {
+    const node = doc.createElement(tag);
+    node.textContent = text;
+    if (className) node.className = className;
+    parent.appendChild(node);
+    return node;
   };
+  addText("h1", project.titre || "Projet");
+  addText("p", `Exporté le ${new Date().toLocaleString("fr-FR")}`, doc.body, "muted");
+  for (const [heading, value] of [["Description", project.description], ["Objectifs", project.objectifs], ["Résultats attendus", project.resultats_attendus]]) {
+    addText("h2", heading);
+    addText("p", value || "Non renseigné.");
+  }
+  addText("h2", `Tâches (${tasks.length})`);
+  if (tasks.length === 0) addText("p", "Aucune tâche enregistrée.");
+  tasks.forEach((task) => {
+    const item = addText("article", "", doc.body, "task");
+    addText("strong", task.title, item);
+    addText("p", task.description || "", item);
+    addText("p", `${statusLabels[task.status] || task.status} · ${task.assignee_name || "Sans responsable"} · ${task.due_date || "Sans échéance"} · Priorité ${task.priority}`, item, "muted");
+  });
+  printWindow.focus();
+  printWindow.setTimeout(() => printWindow.print(), 250);
+}
 
-  useEffect(() => {
-    let actif = true;
-    const charger = async () => {
-      try {
-        const [projetsData, usersData] = await Promise.all([
-          getProjets(),
-          getUtilisateurs(),
-        ]);
-        if (actif) {
-          setProjets(projetsData || []);
-          setUtilisateurs(usersData || []);
-        }
-      } catch (err) {
-        if (actif) {
-          setNotification({
-            message: err.message || "Erreur de chargement.",
-            type: "error",
-          });
-        }
-      }
-    };
+export default function Projets() {
+  const { utilisateurConnecte } = useAuth();
+  const role = normalizeRole(utilisateurConnecte?.role);
+  const canLead = role === "CHEF_DE_PROJET";
+  const canManageTasks = canLead || (role === "SOUS_CHEF_DE_PROJET" && utilisateurConnecte?.can_manage_tasks);
+  const canManage = canManageTasks;
+  const isSuper = role === "SUPER_ADMIN";
+  const [projects, setProjects] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [taskFor, setTaskFor] = useState("");
+  const [task, setTask] = useState(blankTask);
+  const [notice, setNotice] = useState({ message: "", type: "success" });
+  const [error, setError] = useState("");
 
-    void charger();
-    return () => {
-      actif = false;
-    };
+  const load = useCallback(async () => {
+    try {
+      const [projectRows, userRows, taskRows] = await Promise.all([getProjets(), getUtilisateurs(), getTaches()]);
+      setProjects(projectRows || []);
+      setUsers(userRows || []);
+      setTasks(taskRows || []);
+      setError("");
+    } catch (err) { setError(err.message || "Chargement des projets impossible."); }
   }, []);
 
-  const handleCreerProjet = async (e) => {
-    e.preventDefault();
-    if (!titre.trim()) return;
+  useEffect(() => {
+    let active = true;
+    const loadInitial = async () => {
+      try {
+        const [projectRows, userRows, taskRows] = await Promise.all([getProjets(), getUtilisateurs(), getTaches()]);
+        if (active) { setProjects(projectRows || []); setUsers(userRows || []); setTasks(taskRows || []); }
+      } catch (err) { if (active) setError(err.message || "Chargement des projets impossible."); }
+    };
+    void loadInitial();
+    return () => { active = false; };
+  }, []);
 
+  const createProject = async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
     try {
-      const responsable = utilisateurs.find((utilisateur) => utilisateur.id === Number(chefId));
       await ajouterProjet({
-        titre: titre.trim(),
-        description,
-        responsable: responsable?.nom || responsable?.email || userActuel?.nom || userActuel?.email || "Non assigné",
-        statut,
+        titre: data.get("titre"), description: data.get("description"),
+        objectifs: data.get("objectifs"), resultats_attendus: data.get("resultats_attendus"),
       });
-
-      setTitre("");
-      setDescription("");
-      setChefId("");
-      setStatut("En cours");
-
-      await chargerDonnees();
-      setNotification({ message: "Projet créé avec succès !", type: "success" });
-    } catch (err) {
-      setNotification({ message: err.message || "Erreur lors de la création.", type: "error" });
-    }
+      event.currentTarget.reset();
+      await load();
+      setNotice({ message: "Projet enregistré.", type: "success" });
+    } catch (err) { setNotice({ message: err.message || "Création impossible.", type: "error" }); }
   };
 
-  const handleChangerStatut = async (id, nouveauStatut) => {
+  const saveProject = async (project) => {
     try {
-      const projet = projets.find((item) => item.id === id);
-      if (!projet) throw new Error("Projet introuvable.");
-      await modifierProjet(id, {
-        titre: projet.titre,
-        description: projet.description || "",
-        statut: nouveauStatut,
-        responsable: projet.responsable || "Non assigné",
+      await modifierProjet(project.id, {
+        titre: project.titre, description: project.description || "",
+        objectifs: project.objectifs || "", resultats_attendus: project.resultats_attendus || "",
+        statut: project.statut || "En cours",
       });
-      await chargerDonnees();
-      setNotification({ message: "Statut mis à jour.", type: "success" });
-    } catch (err) {
-      setNotification({ message: err.message || "Erreur de mise à jour.", type: "error" });
-    }
+      setEditing(null);
+      await load();
+      setNotice({ message: "Projet mis à jour.", type: "success" });
+    } catch (err) { setNotice({ message: err.message || "Modification impossible.", type: "error" }); }
   };
 
-  const handleSupprimer = async (id) => {
-    if (!window.confirm("Voulez-vous supprimer ce projet ?")) return;
+  const changeProjectStatus = async (project, statut) => {
     try {
-      await supprimerProjet(id);
-      await chargerDonnees();
-      setNotification({ message: "Projet supprimé.", type: "info" });
-    } catch (err) {
-      setNotification({ message: err.message || "Erreur de suppression.", type: "error" });
-    }
+      await modifierProjet(project.id, {
+        titre: project.titre, description: project.description || "",
+        objectifs: project.objectifs || "", resultats_attendus: project.resultats_attendus || "", statut,
+      });
+      await load();
+      setNotice({ message: "État du projet mis à jour.", type: "success" });
+    } catch (err) { setNotice({ message: err.message || "Mise à jour impossible.", type: "error" }); }
   };
 
-  return (
-    <div className="max-w-6xl mx-auto p-4 space-y-8">
-      <Toast
-        message={notification.message}
-        type={notification.type}
-        onClose={() => setNotification({ message: "", type: "success" })}
-      />
+  const createTask = async (event) => {
+    event.preventDefault();
+    try {
+      await ajouterTache({
+        project_id: Number(taskFor), title: task.title, description: task.description,
+        assigned_to: task.assigned_to ? Number(task.assigned_to) : null,
+        due_date: task.due_date || null, priority: task.priority,
+      });
+      setTask(blankTask);
+      setTaskFor("");
+      await load();
+      setNotice({ message: "Tâche enregistrée et attribuée.", type: "success" });
+    } catch (err) { setNotice({ message: err.message || "Création de tâche impossible.", type: "error" }); }
+  };
 
-      <div className="flex justify-between items-center border-b pb-4 border-gray-200 dark:border-gray-700">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-            Gestion des Projets
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Créez, attribuez et gérez l'avancement des projets de votre équipe
-          </p>
-        </div>
-      </div>
+  const updateStatus = async (taskId, status) => {
+    try { await modifierEtatTache(taskId, status); await load(); }
+    catch (err) { setNotice({ message: err.message || "Mise à jour impossible.", type: "error" }); }
+  };
 
-      {/* Formulaire de création de projet (Garantie d'affichage pour l'Administrateur) */}
-      {peutCreerProjet && (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 space-y-6">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-700">
-            ➕ Créer un nouveau projet
-          </h2>
+  const removeTask = async (taskId) => {
+    if (!window.confirm("Supprimer cette tâche ?")) return;
+    try { await supprimerTache(taskId); await load(); }
+    catch (err) { setNotice({ message: err.message || "Suppression impossible.", type: "error" }); }
+  };
 
-          <form onSubmit={handleCreerProjet} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
-                Titre du projet
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="ex: Projet UTE - Module Auth"
-                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                value={titre}
-                onChange={(e) => setTitre(e.target.value)}
-              />
+  const removeProject = async (id) => {
+    if (!window.confirm("Supprimer le projet et ses tâches associées ?")) return;
+    try { await supprimerProjet(id); await load(); }
+    catch (err) { setNotice({ message: err.message || "Suppression impossible.", type: "error" }); }
+  };
+
+  const field = "w-full rounded-xl border border-[var(--tm-border)] bg-[var(--tm-bg)] p-3 text-sm";
+  return <section className="mx-auto max-w-6xl space-y-6">
+    <Toast message={notice.message} type={notice.type} onClose={() => setNotice({ message: "", type: "success" })} />
+    <header><h1 className="text-2xl font-bold">Projets et tâches</h1><p className="mt-1 text-sm opacity-70">Objectifs structurés, responsabilités et suivi de l’avancement.</p></header>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">{error}</p>}
+
+    {canLead && <form onSubmit={createProject} className="grid grid-cols-1 gap-4 rounded-2xl border border-[var(--tm-border)] bg-[var(--tm-surface)] p-5 shadow-sm md:grid-cols-2">
+      <h2 className="md:col-span-2 text-lg font-semibold">Créer un projet</h2>
+      <input required name="titre" maxLength={200} placeholder="Titre du projet" className={field} />
+      <div className="hidden md:block" />
+      <label className="text-sm font-medium">Description<textarea name="description" rows={5} placeholder="Contexte et description générale…" className={`${field} mt-1 whitespace-pre-wrap`} /></label>
+      <label className="text-sm font-medium">Objectifs<textarea name="objectifs" rows={5} placeholder="Un objectif par ligne…" className={`${field} mt-1 whitespace-pre-wrap`} /></label>
+      <label className="text-sm font-medium md:col-span-2">Résultats attendus<textarea name="resultats_attendus" rows={3} placeholder="Livrables et critères de réussite…" className={`${field} mt-1 whitespace-pre-wrap`} /></label>
+      <button className="w-fit rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Créer le projet</button>
+    </form>}
+
+    {canManage && projects.length > 0 && <form onSubmit={createTask} className="grid grid-cols-1 gap-3 rounded-2xl border border-[var(--tm-border)] bg-[var(--tm-surface)] p-5 md:grid-cols-2">
+      <h2 className="md:col-span-2 text-lg font-semibold">Ajouter une tâche</h2>
+      <select required value={taskFor} onChange={(e) => setTaskFor(e.target.value)} className={field}><option value="">Projet concerné</option>{projects.map((p) => <option value={p.id} key={p.id}>{p.titre}</option>)}</select>
+      <input required maxLength={200} value={task.title} onChange={(e) => setTask({ ...task, title: e.target.value })} placeholder="Intitulé" className={field} />
+      <textarea rows={2} value={task.description} onChange={(e) => setTask({ ...task, description: e.target.value })} placeholder="Description / consignes" className={field} />
+      <select value={task.assigned_to} onChange={(e) => setTask({ ...task, assigned_to: e.target.value })} className={field}><option value="">Sans responsable</option>{users.filter((u) => normalizeRole(u.role) !== "SUPER_ADMIN").map((u) => <option key={u.id} value={u.id}>{[u.prenom, u.nom].filter(Boolean).join(" ") || u.email}</option>)}</select>
+      <label className="text-sm">Échéance<input type="date" value={task.due_date} onChange={(e) => setTask({ ...task, due_date: e.target.value })} className={`${field} mt-1`} /></label>
+      <label className="text-sm">Priorité<select value={task.priority} onChange={(e) => setTask({ ...task, priority: e.target.value })} className={`${field} mt-1`}><option value="LOW">Basse</option><option value="NORMAL">Normale</option><option value="HIGH">Haute</option><option value="URGENT">Urgente</option></select></label>
+      <button disabled={!taskFor} className="w-fit rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Enregistrer la tâche</button>
+    </form>}
+
+    <div className="grid grid-cols-1 gap-4">
+      {projects.length === 0 ? <p className="rounded-xl border border-dashed border-[var(--tm-border)] p-8 text-center opacity-70">Aucun projet dans cet espace.</p> : projects.map((project) => {
+        const projectTasks = tasks.filter((item) => item.project_id === project.id);
+        return <article key={project.id} className="space-y-4 rounded-2xl border border-[var(--tm-border)] bg-[var(--tm-surface)] p-5 shadow-sm">
+          {editing?.id === project.id ? <div className="grid gap-3">
+            <input value={editing.titre} onChange={(e) => setEditing({ ...editing, titre: e.target.value })} className={field} />
+            {["description", "objectifs", "resultats_attendus"].map((key) => <label key={key} className="text-sm capitalize">{key.replace("_", " ")}<textarea rows={key === "description" ? 5 : 3} value={editing[key] || ""} onChange={(e) => setEditing({ ...editing, [key]: e.target.value })} className={`${field} mt-1 whitespace-pre-wrap`} /></label>)}
+            <div className="flex gap-2"><button onClick={() => saveProject(editing)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white">Enregistrer</button><button onClick={() => setEditing(null)} className="rounded-lg border border-[var(--tm-border)] px-4 py-2 text-sm">Annuler</button></div>
+          </div> : <>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold">{project.titre}</h2>{isSuper && <p className="mt-1 text-xs opacity-65">Espace : {project.workspace_name || "Historique non attribué"}</p>}</div><div className="flex flex-wrap items-center gap-2">{canLead ? <select aria-label="État du projet" value={project.statut} onChange={(e) => changeProjectStatus(project, e.target.value)} className="rounded-full border border-[var(--tm-border)] bg-[var(--tm-bg)] px-3 py-1 text-xs font-semibold"><option>En cours</option><option>En attente</option><option>Terminé</option></select> : <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-100">{project.statut}</span>}<button type="button" onClick={() => { try { ouvrirExportProjet(project, projectTasks); } catch (err) { setNotice({ message: err.message, type: "error" }); } }} className="rounded-lg border border-[var(--tm-border)] px-3 py-2 text-sm">Exporter en PDF</button></div></div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {[["Description", project.description], ["Objectifs", project.objectifs], ["Résultats attendus", project.resultats_attendus]].map(([label, value]) => <div key={label} className="rounded-xl bg-[var(--tm-bg)] p-3"><h3 className="mb-1 text-xs font-bold uppercase tracking-wide opacity-65">{label}</h3><p className="whitespace-pre-wrap text-sm leading-relaxed">{value || "Non renseigné."}</p></div>)}
             </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
-                Description du projet (multi-lignes)
-              </label>
-              <textarea
-                rows="5"
-                placeholder="Objectifs du projet, étapes, livrables attendus..."
-                className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm font-sans leading-relaxed outline-none focus:ring-2 focus:ring-blue-500"
-                style={{ whiteSpace: "pre-wrap" }}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
-                  Chef de projet
-                </label>
-                <select
-                  className="w-full p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm"
-                  value={chefId}
-                  onChange={(e) => setChefId(e.target.value)}
-                >
-                  <option value="">-- Choisir le chef de projet --</option>
-                  {utilisateurs.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nom} ({u.role || "Membre"})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-            </div>
-
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Le backend enregistre un responsable unique par projet. La gestion des sous-chefs et des membres nécessite une évolution de son schéma.
-            </p>
-
-            <div className="flex justify-between items-center pt-2">
-              <select
-                className="p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white"
-                value={statut}
-                onChange={(e) => setStatut(e.target.value)}
-              >
-                <option value="En cours">En cours</option>
-                <option value="En attente">En attente</option>
-                <option value="Terminé">Terminé</option>
-              </select>
-
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow-md transition"
-              >
-                Créer le projet
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Cartes des Projets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {projets.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400 italic">
-            Aucun projet enregistré. Utilisez le formulaire ci-dessus pour en créer un.
-          </p>
-        ) : (
-          projets.map((p) => (
-            <div
-              key={p.id}
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between space-y-4"
-            >
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">
-                    {p.titre}
-                  </h3>
-                  <span
-                    className={`px-2.5 py-1 text-xs font-bold rounded-full ${
-                      p.statut === "Terminé"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : p.statut === "En cours"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                        : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
-                    }`}
-                  >
-                    {p.statut}
-                  </span>
-                </div>
-
-                <div
-                  className="text-gray-700 dark:text-gray-300 text-sm bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl mb-4 border border-gray-100 dark:border-gray-800 leading-relaxed"
-                  style={{ whiteSpace: "pre-wrap" }}
-                >
-                  {p.description || "Aucune description fournie."}
-                </div>
-
-                <div className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
-                  <p>
-                    👑 <strong className="text-gray-700 dark:text-gray-300">Responsable :</strong>{" "}
-                    {p.responsable || "Non assigné"}
-                  </p>
-                </div>
-              </div>
-
-              {peutCreerProjet && (
-                <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-gray-700">
-                  <select
-                    className="text-xs p-1.5 border border-gray-300 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
-                    value={p.statut}
-                    onChange={(e) => handleChangerStatut(p.id, e.target.value)}
-                  >
-                    <option value="En cours">En cours</option>
-                    <option value="En attente">En attente</option>
-                    <option value="Terminé">Terminé</option>
-                  </select>
-
-                  <button
-                    onClick={() => handleSupprimer(p.id)}
-                    className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline"
-                  >
-                    Supprimer
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+            {canLead && <div className="flex flex-wrap gap-2 border-t border-[var(--tm-border)] pt-3"><button onClick={() => setEditing({ ...project })} className="rounded-lg border border-[var(--tm-border)] px-3 py-2 text-sm">Modifier le projet</button><button onClick={() => removeProject(project.id)} className="rounded-lg px-3 py-2 text-sm text-red-600">Supprimer</button></div>}
+          </>}
+          <section className="border-t border-[var(--tm-border)] pt-3"><h3 className="mb-2 font-semibold">Tâches ({projectTasks.length})</h3>{projectTasks.length === 0 ? <p className="text-sm opacity-60">Aucune tâche enregistrée.</p> : <ul className="space-y-2">{projectTasks.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--tm-bg)] p-3"><div className="min-w-0 flex-1"><p className="font-medium">{item.title}</p>{item.description && <p className="whitespace-pre-wrap text-sm opacity-70">{item.description}</p>}<p className="mt-1 text-xs opacity-60">{item.assignee_name || "Sans responsable"} · {item.due_date || "Sans échéance"} · priorité {item.priority}</p></div>{!isSuper && <select aria-label={`État de ${item.title}`} value={item.status} onChange={(e) => updateStatus(item.id, e.target.value)} className="rounded-lg border border-[var(--tm-border)] bg-[var(--tm-surface)] p-2 text-sm"><option value="TODO">{statusLabels.TODO}</option><option value="IN_PROGRESS">{statusLabels.IN_PROGRESS}</option><option value="DONE">{statusLabels.DONE}</option></select>}{canManage && <button onClick={() => removeTask(item.id)} className="text-xs text-red-600 underline">Supprimer</button>}</li>)}</ul>}</section>
+        </article>;
+      })}
     </div>
-  );
+  </section>;
 }

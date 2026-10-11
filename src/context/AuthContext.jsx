@@ -76,9 +76,10 @@ export function AuthProvider({ children }) {
     setUtilisateurConnecte(null);
   };
 
-  // Indique facilement si l'utilisateur actuellement connecté est un Administrateur
+  // L'interface distingue le privilège global du chef d'espace.
   const role = normalizeRole(utilisateurConnecte?.role);
-  const estAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
+  const estAdmin = role === "SUPER_ADMIN";
+  const estChefProjet = role === "CHEF_DE_PROJET";
 
   return (
     <AuthContext.Provider
@@ -87,6 +88,7 @@ export function AuthProvider({ children }) {
         token,
         utilisateurConnecte,
         estAdmin,
+        estChefProjet,
         seConnecter,
         seDeconnecter,
         loading

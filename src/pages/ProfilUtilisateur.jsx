@@ -121,7 +121,7 @@ export default function ProfilUtilisateur() {
                 <h3 className="font-bold text-gray-800 dark:text-white">
                   {p.titre}
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 my-2">
+                <p className="text-sm text-gray-500 dark:text-gray-400 my-2 whitespace-pre-wrap">
                   {p.description || "Sans description"}
                 </p>
               </div>

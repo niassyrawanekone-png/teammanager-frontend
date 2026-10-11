@@ -1,16 +1,33 @@
-# React + Vite
+# Team Manager — interface web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Application React 19 servie par Vite 8. Le frontend communique avec l’API FastAPI du dossier `backend`.
 
-Currently, two official plugins are available:
+## Configuration locale
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Node.js 20.19+ ou 22.12+ est requis par Vite 8. Installer les dépendances verrouillées puis lancer le serveur de développement :
 
-## React Compiler
+```sh
+npm ci
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+L’API par défaut est `https://teammanager-fl0y.onrender.com`. Pour utiliser une autre API en développement, créer un fichier `.env.local` non versionné :
 
-## Expanding the ESLint configuration
+```dotenv
+VITE_API_URL=http://127.0.0.1:8000
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Ne placer aucun secret dans une variable `VITE_*` : ces valeurs sont intégrées au code public du navigateur.
+
+## Vérifications
+
+```sh
+npm run lint
+npm run build
+```
+
+Le build est produit dans `dist/`. La configuration Vercel utilise `vercel.json` pour rediriger les routes de l’application vers `index.html`.
+
+## Fonctionnalités
+
+Les écrans de connexion, inscription, équipe, projets, tâches, discussions, notifications et assistant sont dans `src/pages`. L’espace d’administration globale est disponible aux comptes super administrateur via `/administration`; les autorisations effectives sont contrôlées par le backend.

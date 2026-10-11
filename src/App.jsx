@@ -16,6 +16,11 @@ import Page404 from './pages/Page404';
 import Profil from './pages/Profil';
 import EspacePartage from './pages/EspacePartage';
 import Inscription from './pages/Inscription';
+import MotDePasseOublie from './pages/MotDePasseOublie';
+import ReinitialiserMotDePasse from './pages/ReinitialiserMotDePasse';
+import ActiverCompte from './pages/ActiverCompte';
+import AssistantIA from './pages/AssistantIA';
+import Administration from './pages/Administration';
 
 function App() {
   // Appliquer le thème enregistré dans localStorage au démarrage
@@ -31,7 +36,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-gray-50 text-gray-800 transition-colors duration-200 dark:bg-gray-900 dark:text-gray-100">
+        <div className="min-h-screen bg-[var(--tm-bg)] text-[var(--tm-text)] transition-colors duration-200">
           <Navbar />
 
           <main className="py-8 px-4">
@@ -40,6 +45,9 @@ function App() {
               <Route path="/" element={<Accueil />} />
               <Route path="/connexion" element={<Connexion />} />
               <Route path="/inscription" element={<Inscription />} />
+              <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
+              <Route path="/reinitialiser-mot-de-passe" element={<ReinitialiserMotDePasse />} />
+              <Route path="/activer-compte" element={<ActiverCompte />} />
               <Route path="/apropos" element={<APropos />} />
 
               {/* Redirection si quelqu'un cherche /partage vers /espace-partage */}
@@ -93,6 +101,8 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/assistant-ia" element={<ProtectedRoute><AssistantIA /></ProtectedRoute>} />
+              <Route path="/administration" element={<ProtectedRoute><Administration /></ProtectedRoute>} />
 
               {/* Route Fallback */}
               <Route path="*" element={<Page404 />} />

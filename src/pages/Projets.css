@@ -1,169 +1,115 @@
 .projets-container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 24px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #336ff1;
+  width: min(100%, 960px);
+  margin-inline: auto;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  color: var(--tm-text);
 }
 
-.title {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: #220bec;
-}
-
-/* Formulaire d'ajout */
-.form-card {
-  background: #7beedf;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  margin-bottom: 24px;
+.projets-container .form-card,
+.projet-card {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius);
+  background: var(--tm-surface);
+  box-shadow: var(--tm-shadow);
+  padding: 1.25rem;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
 }
 
 .form-grid-full {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
-.form-input, .form-select, .form-textarea {
+.form-input,
+.form-select,
+.form-textarea {
   width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.form-input:focus, .form-select:focus, .form-textarea:focus {
-  border-color: #2563eb;
+  min-width: 0;
+  border: 1px solid var(--tm-border);
+  border-radius: 0.75rem;
+  background: var(--tm-surface);
+  color: var(--tm-text);
+  padding: 0.75rem 0.9rem;
 }
 
 .form-textarea {
+  min-height: 10rem;
   resize: vertical;
-  min-height: 80px;
+  white-space: pre-wrap;
 }
 
-.btn-add {
-  background-color: #2563eb;
-  color: white;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-  grid-column: span 2;
-}
-
-.btn-add:hover {
-  background-color: #1d4ed8;
-}
-
-/* Cartes des projets */
 .projets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.projet-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-}
-
-.projet-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
 }
 
 .projet-title {
+  color: var(--tm-text);
+  font-size: 1rem;
   font-weight: 700;
-  font-size: 16px;
-  color: #0f172a;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .projet-desc {
-  font-size: 13px;
-  color: #64748b;
-  margin-bottom: 12px;
+  color: var(--tm-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
 }
 
 .projet-responsable {
-  font-size: 12px;
-  color: #475569;
-  font-weight: 500;
-  margin-bottom: 16px;
+  color: var(--tm-text-muted);
+  font-size: 0.8rem;
 }
 
-/* Badges de Statut */
 .badge-statut {
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .badge-en-cours {
-  background-color: #fef3c7;
-  color: #d97706;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .badge-termine {
-  background-color: #dcfce7;
-  color: #15803d;
+  background: #dcfce7;
+  color: #166534;
 }
 
 .badge-en-attente {
-  background-color: #f1f5f9;
-  color: #64748b;
+  background: #f1f5f9;
+  color: #475569;
 }
 
-/* Zone d'action */
-.actions-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+html.dark .badge-en-cours {
+  background: #1e3a8a;
+  color: #dbeafe;
 }
 
-.select-statut {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 12px;
-  background-color: #fff;
+html.dark .badge-termine {
+  background: #14532d;
+  color: #dcfce7;
 }
 
-.btn-delete {
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+html.dark .badge-en-attente {
+  background: #334155;
+  color: #e2e8f0;
 }
 
-.btn-delete:hover {
-  background-color: #fee2e2;
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid-full {
+    grid-column: auto;
+  }
 }

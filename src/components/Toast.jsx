@@ -20,7 +20,9 @@ export default function Toast({ message, type = "success", onClose }) {
 
   return (
     <div
-      className={`fixed top-5 right-5 z-50 text-white px-5 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all duration-300 ${
+      role={type === "error" ? "alert" : "status"}
+      aria-live={type === "error" ? "assertive" : "polite"}
+      className={`fixed top-4 left-4 right-4 sm:left-auto sm:right-5 sm:max-w-md z-50 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 transition-all duration-300 ${
         bgColors[type] || bgColors.info
       }`}
     >
