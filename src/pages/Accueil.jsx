@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getProjets, getMessagesPartage } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function Accueil() {
-  const token = sessionStorage.getItem("token");
-  const storedUser = sessionStorage.getItem("user");
-  const user = storedUser ? JSON.parse(storedUser) : null;
+  const { estConnecte, token, utilisateurConnecte: user } = useAuth();
 
   const [projetsCount, setProjetsCount] = useState(0);
   const [dernierMessage, setDernierMessage] = useState(null);
-  const [chargement, setChargement] = useState(Boolean(token));
+  const [chargement, setChargement] = useState(estConnecte);
 
   useEffect(() => {
-    if (!token) return;
+    if (!estConnecte) return undefined;
 
     let actif = true;
     Promise.all([getProjets(), getMessagesPartage()])
@@ -31,10 +30,10 @@ export default function Accueil() {
     return () => {
       actif = false;
     };
-  }, [token]);
+  }, [estConnecte, token]);
 
   // ================= 1. PAGE D'ACCUEIL POUR VISITEUR NON CONNECTÉ =================
-  if (!token) {
+  if (!estConnecte) {
     return (
       <div className="min-h-screen bg-gradient-to-tr from-sky-400 via-teal-400 to-emerald-400 flex flex-col justify-center items-center px-4 py-12 text-center">
         <div className="max-w-3xl bg-white/95 backdrop-blur-md p-8 md:p-14 rounded-3xl shadow-2xl border border-white/20">

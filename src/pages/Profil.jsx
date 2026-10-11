@@ -4,17 +4,11 @@ import { modifierMotDePasseUtilisateur } from "../services/api";
 import Toast from "../components/Toast";
 
 export default function Profil() {
-  const { utilisateurConnecte } = useAuth();
-  const { seConnecter } = useAuth();
+  const { utilisateurConnecte: user, seConnecter } = useAuth();
   const [ancienMdp, setAncienMdp] = useState("");
   const [nouveauMdp, setNouveauMdp] = useState("");
   const [confirmationMdp, setConfirmationMdp] = useState("");
   const [notification, setNotification] = useState({ message: "", type: "success" });
-
-  const storedUser = JSON.parse(
-    sessionStorage.getItem("user") || localStorage.getItem("user") || "null"
-  );
-  const user = utilisateurConnecte || storedUser;
 
   const afficherToast = (message, type = "success") => {
     setNotification({ message, type });

@@ -23,9 +23,8 @@ export default function Membres() {
 
   const { utilisateurConnecte } = useAuth();
 
-  // Récupération sécurisée de l'utilisateur stocké en session pour forcer l'affichage si admin
-  const storedUser = JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "{}");
-  const roleActuel = utilisateurConnecte?.role || storedUser?.role;
+  // Le profil chargé par le contexte d'authentification détermine les actions disponibles.
+  const roleActuel = utilisateurConnecte?.role;
 
   const roleNormalise = normalizeRole(roleActuel);
   const estAdmin = roleNormalise === "CHEF_DE_PROJET";
