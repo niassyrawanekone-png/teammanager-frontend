@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { normalizeRole } from "../services/roles";
 import {
-  createAdminProject, createAdminWorkspace, getAdminOverview, getAdminProjects,
+  createAdminProject, createAdminWorkspace, deleteAdminUser, getAdminOverview, getAdminProjects,
   getAdminUsers, getAdminWorkspaces, updateAdminMemberRole, updateAdminProject,
   updateAdminWorkspace,
 } from "../services/api";
@@ -111,6 +111,18 @@ export default function Administration() {
     void perform(() => updateAdminMemberRole(user.id, draft.role, draft.can_manage_tasks), "Rôle mis à jour.");
   };
 
+  const removeUser = (user) => {
+    const deleteWorkspace = ownerIds.has(user.id);
+    const description = deleteWorkspace
+      ? `Supprimer ${displayName(user)} ainsi que son espace, ses projets, tâches, messages, vocaux, photos et notifications ? Cette action est irréversible.`
+      : `Supprimer le compte ${displayName(user)} ? Ses messages existants seront conservés.`;
+    if (!window.confirm(description)) return;
+    void perform(
+      () => deleteAdminUser(user.id, deleteWorkspace),
+      deleteWorkspace ? "Le compte et son espace ont été supprimés." : "Le compte a été supprimé.",
+    );
+  };
+
   return <div className="mx-auto max-w-6xl space-y-6">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div><p className="text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Administration globale</p><h1 className="mt-1 text-3xl font-bold">Vue d’ensemble</h1><p className="mt-2 text-sm opacity-70">Les contrôles d’autorisation restent appliqués par l’API à chaque opération.</p></div>
@@ -125,7 +137,7 @@ export default function Administration() {
 
       <section className={cardClass}>
         <h2 className="text-xl font-bold">Espaces de travail</h2>
-        <p className="mt-1 text-sm opacity-70">Les espaces sont conservés; cette interface ne propose pas de suppression globale.</p>
+        <p className="mt-1 text-sm opacity-70">La suppression d’un compte propriétaire efface aussi son espace et les données associées, après confirmation.</p>
         <div className="mt-4 space-y-3">{workspaces.length ? workspaces.map((space) => {
           const members = users.filter((user) => user.workspace_id === space.id && !isSuperUser(user));
           const draft = workspaceDrafts[space.id] || { name: space.name, owner: "" };
@@ -175,6 +187,7 @@ export default function Administration() {
             <div><h3 className="font-semibold">{displayName(user)}</h3><p className="text-xs opacity-65">{user.workspace_name || "Aucun espace"} · {isSuperUser(user) ? "Super administrateur" : ownerIds.has(user.id) ? "Propriétaire d’espace" : user.workspace_id ? "Membre" : "Compte sans espace"}</p></div>
             {protectedUser ? <p className="text-sm opacity-65">Rôle protégé</p> : <div className="flex flex-wrap items-end gap-3"><label className="flex-1 text-sm">Rôle<select className={inputClass} value={draft.role} onChange={(event) => setRoleDrafts((old) => ({ ...old, [user.id]: { ...old[user.id], role: event.target.value } }))}><option value="MEMBRE">Membre</option><option value="SOUS_CHEF_DE_PROJET">Sous-chef de projet</option></select></label><label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" checked={draft.can_manage_tasks} disabled={draft.role !== "SOUS_CHEF_DE_PROJET"} onChange={(event) => setRoleDrafts((old) => ({ ...old, [user.id]: { ...old[user.id], can_manage_tasks: event.target.checked } }))} />Gérer les tâches</label></div>}
             {!protectedUser && <button type="button" className={buttonClass} disabled={busy} onClick={() => saveRole(user)}>Enregistrer</button>}
+            {!isSuperUser(user) && <button type="button" className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40" disabled={busy} onClick={() => removeUser(user)}>{ownerIds.has(user.id) ? "Supprimer le compte et son espace" : "Supprimer le compte"}</button>}
           </article>;
         })}</div>
       </section>

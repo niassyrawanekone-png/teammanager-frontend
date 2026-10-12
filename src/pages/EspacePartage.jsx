@@ -9,9 +9,43 @@ import {
   supprimerMessagePartage,
 } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { normalizeRole } from "../services/roles";
+import { normalizeRole, peutSupprimerMessage } from "../services/roles";
 
 const dateMessage = (value) => new Date(value).toLocaleString();
+const MAX_VOICE_SECONDS = 9 * 60;
+
+function encodeVoiceWav(chunks, sampleRate) {
+  const sampleCount = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const buffer = new ArrayBuffer(44 + sampleCount * 2);
+  const view = new DataView(buffer);
+  const writeText = (offset, value) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+  writeText(0, "RIFF");
+  view.setUint32(4, 36 + sampleCount * 2, true);
+  writeText(8, "WAVE");
+  writeText(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, "data");
+  view.setUint32(40, sampleCount * 2, true);
+  let offset = 44;
+  for (const chunk of chunks) {
+    for (const sample of chunk) {
+      const clamped = Math.max(-1, Math.min(1, sample));
+      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+      offset += 2;
+    }
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
 
 function AttachmentMedia({ attachment }) {
   const [resource, setResource] = useState({ url: "", src: "", error: "" });
@@ -63,11 +97,13 @@ export default function EspacePartage() {
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const voicePreviewRef = useRef("");
-  const recorderRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const audioSourceRef = useRef(null);
+  const processorRef = useRef(null);
+  const silentOutputRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const discardRecordingRef = useRef(false);
-  const recordingStartedAtRef = useRef(0);
   const recordingTimerRef = useRef(null);
   const textareaRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +148,13 @@ export default function EspacePartage() {
     if (voicePreviewRef.current) URL.revokeObjectURL(voicePreviewRef.current);
     if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    if (processorRef.current) {
+      processorRef.current.onaudioprocess = null;
+      processorRef.current.disconnect();
+    }
+    audioSourceRef.current?.disconnect();
+    silentOutputRef.current?.disconnect();
+    if (audioContextRef.current?.state !== "closed") void audioContextRef.current?.close();
   }, []);
 
   const selectPhoto = (file) => {
@@ -132,7 +174,7 @@ export default function EspacePartage() {
 
   const startVoiceRecording = async () => {
     setError("");
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext) {
       setError("L’enregistrement vocal n’est pas pris en charge par ce navigateur.");
       return;
     }
@@ -140,43 +182,46 @@ export default function EspacePartage() {
       clearVoicePreview();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const supportedType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/webm", "audio/ogg"]
-        .find((type) => MediaRecorder.isTypeSupported(type));
-      if (!supportedType) throw new Error("Ce navigateur ne propose pas de format WebM ou Ogg compatible.");
-      const recorder = new MediaRecorder(stream, { mimeType: supportedType });
-      recorderRef.current = recorder;
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      audioContextRef.current = audioContext;
+      await audioContext.resume();
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      const silentOutput = audioContext.createGain();
+      silentOutput.gain.value = 0;
+      audioSourceRef.current = source;
+      processorRef.current = processor;
+      silentOutputRef.current = silentOutput;
       chunksRef.current = [];
       discardRecordingRef.current = false;
-      recordingStartedAtRef.current = Date.now();
-      recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
-      recorder.onerror = () => setError("Une erreur est survenue pendant l’enregistrement vocal.");
-      recorder.onstop = () => {
-        if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        setRecording(false);
-        if (discardRecordingRef.current) {
-          discardRecordingRef.current = false;
-          chunksRef.current = [];
-          return;
+      processor.onaudioprocess = (event) => {
+        if (!discardRecordingRef.current) {
+          chunksRef.current.push(new Float32Array(event.inputBuffer.getChannelData(0)));
         }
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType.split(";")[0] });
-        chunksRef.current = [];
-        if (!blob.size) { setError("L’enregistrement ne contient aucun son."); return; }
-        const url = URL.createObjectURL(blob);
-        voicePreviewRef.current = url;
-        setVoicePreview(url);
-        setVoice(blob);
-        setRecordSeconds(Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000)));
       };
-      recorder.start();
+      source.connect(processor);
+      processor.connect(silentOutput);
+      silentOutput.connect(audioContext.destination);
       setRecording(true);
       setRecordSeconds(0);
       recordingTimerRef.current = window.setInterval(() => {
-        setRecordSeconds(Math.floor((Date.now() - recordingStartedAtRef.current) / 1000));
+        const sampleCount = chunksRef.current.reduce((total, chunk) => total + chunk.length, 0);
+        const elapsed = Math.floor(sampleCount / (audioContextRef.current?.sampleRate || 16000));
+        setRecordSeconds(elapsed);
+        if (elapsed >= MAX_VOICE_SECONDS) {
+          stopVoiceRecording();
+          setError("La durée maximale d’un message vocal est de 9 minutes.");
+        }
       }, 250);
     } catch (recordError) {
+      processorRef.current?.disconnect();
+      audioSourceRef.current?.disconnect();
+      silentOutputRef.current?.disconnect();
+      if (audioContextRef.current?.state !== "closed") void audioContextRef.current?.close();
+      processorRef.current = null;
+      audioSourceRef.current = null;
+      silentOutputRef.current = null;
+      audioContextRef.current = null;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       setRecording(false);
@@ -186,10 +231,39 @@ export default function EspacePartage() {
 
   const stopVoiceRecording = (discard = false) => {
     discardRecordingRef.current = discard;
-    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    const sampleRate = audioContextRef.current?.sampleRate || 16000;
+    if (processorRef.current) {
+      processorRef.current.onaudioprocess = null;
+      processorRef.current.disconnect();
+    }
+    audioSourceRef.current?.disconnect();
+    silentOutputRef.current?.disconnect();
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (audioContextRef.current?.state !== "closed") void audioContextRef.current?.close();
+    processorRef.current = null;
+    audioSourceRef.current = null;
+    silentOutputRef.current = null;
+    audioContextRef.current = null;
+    setRecording(false);
+    const chunks = chunksRef.current;
+    chunksRef.current = [];
+    if (discard) return;
+    const sampleCount = chunks.reduce((total, chunk) => total + chunk.length, 0);
+    if (!sampleCount) {
+      setError("L’enregistrement ne contient aucun son.");
+      return;
+    }
+    const blob = encodeVoiceWav(chunks, sampleRate);
+    const url = URL.createObjectURL(blob);
+    voicePreviewRef.current = url;
+    setVoicePreview(url);
+    setVoice(blob);
+    setRecordSeconds(Math.max(1, Math.round(sampleCount / sampleRate)));
   };
 
-  const canDelete = isSuper;
   const title = useMemo(() => conversation === "team" ? "Discussion de l’équipe" :
     projets.find((item) => Number(item.id) === Number(projectId))?.titre || "Discussion de projet", [conversation, projets, projectId]);
 
@@ -215,7 +289,7 @@ export default function EspacePartage() {
       try {
         if (photo) await ajouterPhotoMessage(created.id, photo);
         if (voice) {
-          const extension = voice.type === "audio/ogg" ? "ogg" : "webm";
+          const extension = voice.type === "audio/wav" ? "wav" : voice.type === "audio/ogg" ? "ogg" : "webm";
           await ajouterAudioMessage(created.id, new File([voice], `message-vocal.${extension}`, { type: voice.type }));
         }
       } catch (attachmentError) {
@@ -280,7 +354,7 @@ export default function EspacePartage() {
                   <div className="mb-1 flex items-center justify-between gap-4 text-xs opacity-70"><strong>{message.auteur_nom || "Utilisateur"}</strong><time>{dateMessage(message.created_at)}</time></div>
                   <p className="whitespace-pre-wrap break-words text-sm">{message.contenu}</p>
                   {(message.attachments || []).map((attachment) => <AttachmentMedia key={attachment.id} attachment={attachment} />)}
-                  {canDelete && <button type="button" onClick={() => remove(message)} className="mt-2 text-xs text-red-600 underline">Supprimer</button>}
+                  {peutSupprimerMessage(utilisateurConnecte?.role, own) && <button type="button" onClick={() => remove(message)} className="mt-2 text-xs text-red-600 underline">Supprimer le message et ses pièces jointes</button>}
                 </article>;
               })}
       </div>

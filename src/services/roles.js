@@ -29,9 +29,9 @@ export function getRoleDisplayName(role) {
   }
 }
 
-// Le backend autorise la suppression des messages aux administrateurs uniquement.
-export function peutSupprimerMessage(userRole) {
-  return normalizeRole(userRole) === "SUPER_ADMIN";
+export function peutSupprimerMessage(userRole, isAuthor = false) {
+  const role = normalizeRole(userRole);
+  return role === "SUPER_ADMIN" || role === "CHEF_DE_PROJET" || isAuthor;
 }
 
 // Styles de couleur des bulles du chat (Compatible Mode Clair & Sombre)

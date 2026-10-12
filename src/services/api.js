@@ -362,6 +362,9 @@ async function adminRequest(path, options = {}, fallback = "Opération administr
 
 export const getAdminOverview = () => adminRequest("/admin/overview", {}, "Impossible de charger les statistiques globales.");
 export const getAdminUsers = () => adminRequest("/admin/users", {}, "Impossible de charger les utilisateurs.");
+export const deleteAdminUser = (userId, deleteWorkspace = false) => adminRequest(`/admin/users/${userId}`, {
+  method: "DELETE", body: JSON.stringify({ delete_workspace: deleteWorkspace }),
+}, "Impossible de supprimer ce compte.");
 export const getAdminWorkspaces = () => adminRequest("/admin/workspaces", {}, "Impossible de charger les espaces.");
 export const getAdminProjects = () => adminRequest("/admin/projects", {}, "Impossible de charger les projets.");
 
