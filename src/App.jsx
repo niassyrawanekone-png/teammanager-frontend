@@ -21,6 +21,7 @@ import ReinitialiserMotDePasse from './pages/ReinitialiserMotDePasse';
 import ActiverCompte from './pages/ActiverCompte';
 import AssistantIA from './pages/AssistantIA';
 import Administration from './pages/Administration';
+import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
 
 function App() {
   // Appliquer le thème enregistré dans localStorage au démarrage
@@ -49,6 +50,7 @@ function App() {
               <Route path="/reinitialiser-mot-de-passe" element={<ReinitialiserMotDePasse />} />
               <Route path="/activer-compte" element={<ActiverCompte />} />
               <Route path="/apropos" element={<APropos />} />
+              <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
 
               {/* Redirection si quelqu'un cherche /partage vers /espace-partage */}
               <Route path="/partage" element={<Navigate to="/espace-partage" replace />} />
