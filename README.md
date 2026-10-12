@@ -31,3 +31,7 @@ Le build est produit dans `dist/`. La configuration Vercel utilise `vercel.json`
 ## Fonctionnalités
 
 Les écrans de connexion, inscription, équipe, projets, tâches, discussions, notifications et assistant sont dans `src/pages`. L’espace d’administration globale est disponible aux comptes super administrateur via `/administration`; les autorisations effectives sont contrôlées par le backend.
+
+Les anciennes URL `/equipe/membre`, `/equipe/projet` et `/espace_partage` redirigent vers les chemins canoniques `/equipe/membres`, `/equipe/projets` et `/espace-partage`.
+
+Les nouvelles versions de l’API doivent aussi être déployées sur Render pour activer les routes de tâches et les médias de discussion stockés dans PostgreSQL. Avant le déploiement backend, sauvegarder la base ; l’initialisation ajoute la colonne des pièces jointes sans supprimer les anciens médias S3.

@@ -54,6 +54,7 @@ export default function Projets() {
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [tasksError, setTasksError] = useState("");
   const [editing, setEditing] = useState(null);
   const [taskFor, setTaskFor] = useState("");
   const [task, setTask] = useState(blankTask);
@@ -61,36 +62,42 @@ export default function Projets() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    try {
-      const [projectRows, userRows, taskRows] = await Promise.all([getProjets(), getUtilisateurs(), getTaches()]);
-      setProjects(projectRows || []);
-      setUsers(userRows || []);
-      setTasks(taskRows || []);
+    const [projectsResult, usersResult, tasksResult] = await Promise.allSettled([
+      getProjets(), getUtilisateurs(), getTaches(),
+    ]);
+    const coreError = projectsResult.status === "rejected" ? projectsResult.reason :
+      usersResult.status === "rejected" ? usersResult.reason : null;
+    if (coreError) {
+      setError(coreError.message || "Chargement des projets impossible.");
+    } else {
+      setProjects(projectsResult.value || []);
+      setUsers(usersResult.value || []);
       setError("");
-    } catch (err) { setError(err.message || "Chargement des projets impossible."); }
+    }
+    if (tasksResult.status === "rejected") {
+      setTasks([]);
+      setTasksError(tasksResult.reason.message || "Chargement des tâches impossible.");
+    } else {
+      setTasks(tasksResult.value || []);
+      setTasksError("");
+    }
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const loadInitial = async () => {
-      try {
-        const [projectRows, userRows, taskRows] = await Promise.all([getProjets(), getUtilisateurs(), getTaches()]);
-        if (active) { setProjects(projectRows || []); setUsers(userRows || []); setTasks(taskRows || []); }
-      } catch (err) { if (active) setError(err.message || "Chargement des projets impossible."); }
-    };
-    void loadInitial();
-    return () => { active = false; };
-  }, []);
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const createProject = async (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     try {
       await ajouterProjet({
         titre: data.get("titre"), description: data.get("description"),
         objectifs: data.get("objectifs"), resultats_attendus: data.get("resultats_attendus"),
       });
-      event.currentTarget.reset();
+      form.reset();
       await load();
       setNotice({ message: "Projet enregistré.", type: "success" });
     } catch (err) { setNotice({ message: err.message || "Création impossible.", type: "error" }); }
@@ -157,6 +164,7 @@ export default function Projets() {
     <Toast message={notice.message} type={notice.type} onClose={() => setNotice({ message: "", type: "success" })} />
     <header><h1 className="text-2xl font-bold">Projets et tâches</h1><p className="mt-1 text-sm opacity-70">Objectifs structurés, responsabilités et suivi de l’avancement.</p></header>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">{error}</p>}
+    {tasksError && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">Les projets sont disponibles, mais les tâches ne peuvent pas être chargées : {tasksError}</p>}
 
     {canLead && <form onSubmit={createProject} className="grid grid-cols-1 gap-4 rounded-2xl border border-[var(--tm-border)] bg-[var(--tm-surface)] p-5 shadow-sm md:grid-cols-2">
       <h2 className="md:col-span-2 text-lg font-semibold">Créer un projet</h2>
@@ -168,7 +176,7 @@ export default function Projets() {
       <button className="w-fit rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Créer le projet</button>
     </form>}
 
-    {canManage && projects.length > 0 && <form onSubmit={createTask} className="grid grid-cols-1 gap-3 rounded-2xl border border-[var(--tm-border)] bg-[var(--tm-surface)] p-5 md:grid-cols-2">
+    {canManage && projects.length > 0 && !tasksError && <form onSubmit={createTask} className="grid grid-cols-1 gap-3 rounded-2xl border border-[var(--tm-border)] bg-[var(--tm-surface)] p-5 md:grid-cols-2">
       <h2 className="md:col-span-2 text-lg font-semibold">Ajouter une tâche</h2>
       <select required value={taskFor} onChange={(e) => setTaskFor(e.target.value)} className={field}><option value="">Projet concerné</option>{projects.map((p) => <option value={p.id} key={p.id}>{p.titre}</option>)}</select>
       <input required maxLength={200} value={task.title} onChange={(e) => setTask({ ...task, title: e.target.value })} placeholder="Intitulé" className={field} />
@@ -194,7 +202,7 @@ export default function Projets() {
             </div>
             {canLead && <div className="flex flex-wrap gap-2 border-t border-[var(--tm-border)] pt-3"><button onClick={() => setEditing({ ...project })} className="rounded-lg border border-[var(--tm-border)] px-3 py-2 text-sm">Modifier le projet</button><button onClick={() => removeProject(project.id)} className="rounded-lg px-3 py-2 text-sm text-red-600">Supprimer</button></div>}
           </>}
-          <section className="border-t border-[var(--tm-border)] pt-3"><h3 className="mb-2 font-semibold">Tâches ({projectTasks.length})</h3>{projectTasks.length === 0 ? <p className="text-sm opacity-60">Aucune tâche enregistrée.</p> : <ul className="space-y-2">{projectTasks.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--tm-bg)] p-3"><div className="min-w-0 flex-1"><p className="font-medium">{item.title}</p>{item.description && <p className="whitespace-pre-wrap text-sm opacity-70">{item.description}</p>}<p className="mt-1 text-xs opacity-60">{item.assignee_name || "Sans responsable"} · {item.due_date || "Sans échéance"} · priorité {item.priority}</p></div>{!isSuper && <select aria-label={`État de ${item.title}`} value={item.status} onChange={(e) => updateStatus(item.id, e.target.value)} className="rounded-lg border border-[var(--tm-border)] bg-[var(--tm-surface)] p-2 text-sm"><option value="TODO">{statusLabels.TODO}</option><option value="IN_PROGRESS">{statusLabels.IN_PROGRESS}</option><option value="DONE">{statusLabels.DONE}</option></select>}{canManage && <button onClick={() => removeTask(item.id)} className="text-xs text-red-600 underline">Supprimer</button>}</li>)}</ul>}</section>
+          <section className="border-t border-[var(--tm-border)] pt-3"><h3 className="mb-2 font-semibold">Tâches ({projectTasks.length})</h3>{projectTasks.length === 0 ? <p className="text-sm opacity-60">{tasksError ? "Tâches indisponibles tant que l’API n’est pas à jour." : "Aucune tâche enregistrée."}</p> : <ul className="space-y-2">{projectTasks.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--tm-bg)] p-3"><div className="min-w-0 flex-1"><p className="font-medium">{item.title}</p>{item.description && <p className="whitespace-pre-wrap text-sm opacity-70">{item.description}</p>}<p className="mt-1 text-xs opacity-60">{item.assignee_name || "Sans responsable"} · {item.due_date || "Sans échéance"} · priorité {item.priority}</p></div>{!isSuper && <select aria-label={`État de ${item.title}`} value={item.status} onChange={(e) => updateStatus(item.id, e.target.value)} className="rounded-lg border border-[var(--tm-border)] bg-[var(--tm-surface)] p-2 text-sm"><option value="TODO">{statusLabels.TODO}</option><option value="IN_PROGRESS">{statusLabels.IN_PROGRESS}</option><option value="DONE">{statusLabels.DONE}</option></select>}{canManage && <button onClick={() => removeTask(item.id)} className="text-xs text-red-600 underline">Supprimer</button>}</li>)}</ul>}</section>
         </article>;
       })}
     </div>

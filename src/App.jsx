@@ -65,7 +65,9 @@ function App() {
                 {/* Redirige /equipe directement vers /equipe/membres */}
                 <Route index element={<Navigate to="membres" replace />} />
                 <Route path="membres" element={<Membres />} />
+                <Route path="membre" element={<Navigate to="/equipe/membres" replace />} />
                 <Route path="projets" element={<Projets />} />
+                <Route path="projet" element={<Navigate to="/equipe/projets" replace />} />
               </Route>
 
               <Route
@@ -101,6 +103,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/espace_partage" element={<Navigate to="/espace-partage" replace />} />
               <Route path="/assistant-ia" element={<ProtectedRoute><AssistantIA /></ProtectedRoute>} />
               <Route path="/administration" element={<ProtectedRoute><Administration /></ProtectedRoute>} />
 

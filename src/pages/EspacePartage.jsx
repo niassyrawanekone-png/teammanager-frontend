@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ajouterAudioMessage,
   ajouterPhotoMessage,
-  compterMessagesNonLus,
   getMessagesPartage,
+  getPieceJointePartage,
   getProjets,
-  marquerMessagesLus,
   publierMessagePartage,
   supprimerMessagePartage,
 } from "../services/api";
@@ -14,13 +13,46 @@ import { normalizeRole } from "../services/roles";
 
 const dateMessage = (value) => new Date(value).toLocaleString();
 
+function AttachmentMedia({ attachment }) {
+  const [resource, setResource] = useState({ url: "", src: "", error: "" });
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    if (attachment.url?.startsWith("/partage/attachments/")) {
+      getPieceJointePartage(attachment.url).then((url) => {
+        if (!active) {
+          if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url.startsWith("blob:") ? url : "";
+        setResource({ url: attachment.url, src: url, error: "" });
+      }).catch(() => {
+        if (active) setResource({ url: attachment.url, src: "", error: "Impossible de charger cette pièce jointe." });
+      });
+    }
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.url]);
+  const isPrivateAttachment = attachment.url?.startsWith("/partage/attachments/");
+  const displaySrc = isPrivateAttachment
+    ? resource.url === attachment.url ? resource.src : ""
+    : attachment.url || "";
+  if (!attachment.url) return <p className="mt-2 text-xs opacity-70">Le lien privé de cette pièce jointe est indisponible.</p>;
+  if (!displaySrc) return <p className="mt-2 text-xs opacity-70">{isPrivateAttachment && resource.url === attachment.url && resource.error ? resource.error : "Chargement de la pièce jointe…"}</p>;
+  if (attachment.content_type?.startsWith("audio/")) {
+    return <div className="mt-2"><p className="mb-1 text-xs opacity-70">Message vocal</p><audio controls preload="metadata" src={displaySrc} className="max-w-full">Votre navigateur ne peut pas lire ce message vocal.</audio></div>;
+  }
+  return <a href={displaySrc} target="_blank" rel="noreferrer" className="mt-2 block"><img src={displaySrc} alt={attachment.original_name} loading="lazy" className="max-h-72 rounded-lg object-contain" /></a>;
+}
+
 export default function EspacePartage() {
   const { utilisateurConnecte } = useAuth();
   const [projets, setProjets] = useState([]);
   const [projectId, setProjectId] = useState("");
   const [conversation, setConversation] = useState("team");
   const [messages, setMessages] = useState([]);
-  const [unread, setUnread] = useState(0);
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState("");
@@ -29,6 +61,7 @@ export default function EspacePartage() {
   const [voicePreview, setVoicePreview] = useState("");
   const [recording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const voicePreviewRef = useRef("");
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -36,6 +69,7 @@ export default function EspacePartage() {
   const discardRecordingRef = useRef(false);
   const recordingStartedAtRef = useRef(0);
   const recordingTimerRef = useRef(null);
+  const textareaRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -46,28 +80,19 @@ export default function EspacePartage() {
   const refresh = useCallback(async () => {
     if (conversation === "project" && !selectedProjectId) {
       setMessages([]);
-      setUnread(0);
       setLoading(false);
       return;
     }
     try {
       const data = await getMessagesPartage({ conversation, projectId: selectedProjectId });
       setMessages(Array.isArray(data) ? data : []);
-      const unreadCount = await compterMessagesNonLus({ conversation, projectId: selectedProjectId });
-      setUnread(unreadCount?.count || 0);
-      const ids = data.filter((message) => message.auteur_id !== utilisateurConnecte?.id).map((message) => message.id);
-      if (ids.length) await marquerMessagesLus(ids);
-      if (ids.length) {
-        const updated = await compterMessagesNonLus({ conversation, projectId: selectedProjectId });
-        setUnread(updated?.count || 0);
-      }
       setError("");
     } catch (err) {
       setError(err.message || "Impossible de charger la discussion.");
     } finally {
       setLoading(false);
     }
-  }, [conversation, selectedProjectId, utilisateurConnecte?.id]);
+  }, [conversation, selectedProjectId]);
 
   useEffect(() => {
     let active = true;
@@ -168,6 +193,13 @@ export default function EspacePartage() {
   const title = useMemo(() => conversation === "team" ? "Discussion de l’équipe" :
     projets.find((item) => Number(item.id) === Number(projectId))?.titre || "Discussion de projet", [conversation, projets, projectId]);
 
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 144)}px`;
+  }, [text]);
+
   const send = async (event) => {
     event.preventDefault();
     if ((!text.trim() && !photo && !voice) || recording || (conversation === "project" && !selectedProjectId) || isSuper) return;
@@ -177,12 +209,24 @@ export default function EspacePartage() {
     }
     setSending(true);
     setError("");
+    let created;
     try {
-      const created = await publierMessagePartage(text.trim() || (photo ? "Photo jointe" : "Message vocal"), selectedProjectId);
-      if (photo) await ajouterPhotoMessage(created.id, photo);
-      if (voice) {
-        const extension = voice.type === "audio/ogg" ? "ogg" : "webm";
-        await ajouterAudioMessage(created.id, new File([voice], `message-vocal.${extension}`, { type: voice.type }));
+      created = await publierMessagePartage(text.trim() || (photo ? "Photo jointe" : "Message vocal"), selectedProjectId);
+      try {
+        if (photo) await ajouterPhotoMessage(created.id, photo);
+        if (voice) {
+          const extension = voice.type === "audio/ogg" ? "ogg" : "webm";
+          await ajouterAudioMessage(created.id, new File([voice], `message-vocal.${extension}`, { type: voice.type }));
+        }
+      } catch (attachmentError) {
+        try {
+          await supprimerMessagePartage(created.id);
+        } catch (cleanupError) {
+          setError(`La pièce jointe a échoué (${attachmentError.message || "erreur inconnue"}) et le message provisoire n’a pas pu être retiré (${cleanupError.message || "erreur inconnue"}).`);
+          return;
+        }
+        setError(`La pièce jointe n’a pas été envoyée et le message provisoire a été retiré : ${attachmentError.message || "erreur inconnue"}`);
+        return;
       }
       setText("");
       selectPhoto(null);
@@ -223,7 +267,6 @@ export default function EspacePartage() {
               {projets.map((project) => <option key={project.id} value={project.id}>{project.titre}</option>)}
             </select>
           )}
-          <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800 dark:bg-blue-900/50 dark:text-blue-200" aria-label={`${unread} message(s) non lu(s)`}>{unread} non lu{unread > 1 ? "s" : ""}</span>
         </div>
       </header>
       {error && <p className="mx-4 mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-200" role="alert">{error}</p>}
@@ -236,7 +279,7 @@ export default function EspacePartage() {
                 return <article key={message.id} className={`max-w-[92%] rounded-2xl border border-[var(--tm-border)] p-3 sm:max-w-[75%] ${own ? "ml-auto bg-blue-50 dark:bg-blue-950/40" : "bg-[var(--tm-bg)]"}`}>
                   <div className="mb-1 flex items-center justify-between gap-4 text-xs opacity-70"><strong>{message.auteur_nom || "Utilisateur"}</strong><time>{dateMessage(message.created_at)}</time></div>
                   <p className="whitespace-pre-wrap break-words text-sm">{message.contenu}</p>
-                  {(message.attachments || []).map((attachment) => attachment.url ? attachment.content_type?.startsWith("audio/") ? <div key={attachment.id} className="mt-2"><p className="mb-1 text-xs opacity-70">Message vocal · durée affichée par le lecteur</p><audio controls preload="metadata" src={attachment.url} className="max-w-full">Votre navigateur ne peut pas lire ce message vocal.</audio></div> : <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 block"><img src={attachment.url} alt={attachment.original_name} loading="lazy" className="max-h-72 rounded-lg object-contain" /></a> : <p key={attachment.id} className="mt-2 text-xs opacity-70">Pièce jointe stockée; le stockage privé n’est pas disponible pour la lecture.</p>)}
+                  {(message.attachments || []).map((attachment) => <AttachmentMedia key={attachment.id} attachment={attachment} />)}
                   {canDelete && <button type="button" onClick={() => remove(message)} className="mt-2 text-xs text-red-600 underline">Supprimer</button>}
                 </article>;
               })}
@@ -246,12 +289,14 @@ export default function EspacePartage() {
           {preview && <div className="mb-3 flex items-start gap-3"><img src={preview} alt="Aperçu de la photo jointe" className="h-20 w-20 rounded-lg object-cover" /><button type="button" className="text-sm text-red-600 underline" onClick={() => selectPhoto(null)}>Retirer</button></div>}
           {voicePreview && <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--tm-border)] p-3"><audio controls src={voicePreview}>Votre navigateur ne peut pas lire cet aperçu.</audio><span className="text-xs opacity-70">{recordSeconds} s</span><button type="button" className="text-sm text-red-600 underline" onClick={clearVoicePreview}>Annuler le vocal</button></div>}
           {recording && <p className="mb-2 text-sm text-red-600" role="status" aria-live="polite">Enregistrement en cours · {recordSeconds} s</p>}
-          <div className="flex items-end gap-2">
-          <label className="cursor-pointer rounded-lg border border-[var(--tm-border)] px-3 py-2 text-sm" title="Joindre une photo">Photo<input className="sr-only" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={(event) => selectPhoto(event.target.files?.[0] || null)} /></label>
-            {recording ? <button type="button" onClick={() => stopVoiceRecording()} className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700">Arrêter</button> : <button type="button" onClick={() => void startVoiceRecording()} disabled={sending || (conversation === "project" && !selectedProjectId)} className="rounded-lg border border-[var(--tm-border)] px-3 py-2 text-sm disabled:opacity-50">Message vocal</button>}
-            {recording && <button type="button" onClick={() => stopVoiceRecording(true)} className="rounded-lg border border-[var(--tm-border)] px-3 py-2 text-sm">Annuler</button>}
-            <textarea value={text} onChange={(event) => setText(event.target.value)} rows={2} maxLength={5000} disabled={conversation === "project" && !selectedProjectId} placeholder="Écrire un message…" className="min-h-11 flex-1 resize-y rounded-xl border border-[var(--tm-border)] bg-[var(--tm-bg)] p-3 text-sm" />
-            <button disabled={sending || recording || (!text.trim() && !photo && !voice) || (conversation === "project" && !selectedProjectId)} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{sending ? "Envoi…" : "Envoyer"}</button>
+          <div className="flex items-end gap-2 rounded-2xl border border-[var(--tm-border)] bg-[var(--tm-bg)] p-2">
+            <div className="relative">
+              <button type="button" aria-label="Ajouter une pièce jointe" aria-expanded={attachmentMenuOpen} onClick={() => setAttachmentMenuOpen((open) => !open)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-600 text-2xl leading-none text-white hover:bg-blue-700">+</button>
+              {attachmentMenuOpen && <label className="absolute bottom-12 left-0 z-10 cursor-pointer whitespace-nowrap rounded-xl border border-[var(--tm-border)] bg-[var(--tm-surface)] px-4 py-3 text-sm shadow-lg">Ajouter une photo<input className="sr-only" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={(event) => { selectPhoto(event.target.files?.[0] || null); setAttachmentMenuOpen(false); event.target.value = ""; }} /></label>}
+            </div>
+            <textarea ref={textareaRef} value={text} onChange={(event) => setText(event.target.value)} rows={1} maxLength={5000} disabled={conversation === "project" && !selectedProjectId} placeholder="Écrire un message…" className="max-h-36 min-h-10 min-w-0 flex-1 resize-none self-center bg-transparent px-2 py-2 text-sm outline-none" />
+            {recording ? <button type="button" aria-label="Arrêter l’enregistrement" onClick={() => stopVoiceRecording()} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-600 text-white" title="Arrêter l’enregistrement">■</button> : <button type="button" aria-label="Enregistrer un message vocal" onClick={() => void startVoiceRecording()} disabled={sending || (conversation === "project" && !selectedProjectId)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-xl text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:hover:bg-blue-950" title="Message vocal">🎙</button>}
+            <button aria-label="Envoyer le message" disabled={sending || recording || (!text.trim() && !photo && !voice) || (conversation === "project" && !selectedProjectId)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-600 text-lg text-white hover:bg-blue-700 disabled:opacity-50">{sending ? "…" : "➤"}</button>
           </div>
           {photo && photo.size > 5 * 1024 * 1024 && <p className="mt-2 text-xs text-red-600">La photo dépasse la limite de 5 Mio.</p>}
         </form>}

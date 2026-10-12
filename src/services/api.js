@@ -330,6 +330,17 @@ export async function ajouterAudioMessage(messageId, file) {
   return await lireReponse(reponse, "Impossible d'envoyer le message vocal.");
 }
 
+export async function getPieceJointePartage(url) {
+  const reponse = await fetch(`${API_URL}${url}`, { headers: getHeaders() });
+  if (!reponse.ok) await lireReponse(reponse, "Impossible de charger cette pièce jointe.");
+  if (reponse.headers.get("content-type")?.includes("application/json")) {
+    const data = await lireReponse(reponse, "Impossible de charger cette pièce jointe.");
+    if (!data.url) throw new Error("Le lien de cette pièce jointe est indisponible.");
+    return data.url;
+  }
+  return URL.createObjectURL(await reponse.blob());
+}
+
 export async function supprimerMessagePartage(messageId) {
   const reponse = await fetch(`${API_URL}/partage/${messageId}`, {
     method: "DELETE",

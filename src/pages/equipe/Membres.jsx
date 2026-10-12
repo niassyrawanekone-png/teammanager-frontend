@@ -128,10 +128,10 @@ export default function Membres() {
 
       {/* Formulaire d'ajout visible pour l'administrateur */}
       {estAdmin && (
-        <div className="form-card bg-gray-50 dark:bg-gray-800 p-4 rounded-xl mb-6 border border-gray-200 dark:border-gray-700">
-          <form onSubmit={handleAjouter} className="form-row flex flex-col sm:flex-row gap-3">
+        <div className="form-card mb-6 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
+          <form onSubmit={handleAjouter} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr_190px_auto]">
             <input
-              className="form-input p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg flex-1 text-gray-900 dark:text-white"
+              className="form-input min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               type="text"
               placeholder="Prénom"
               value={prenom}
@@ -139,7 +139,7 @@ export default function Membres() {
               required
             />
             <input
-              className="form-input p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg flex-1 text-gray-900 dark:text-white"
+              className="form-input min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               type="text"
               placeholder="Nom"
               value={nom}
@@ -147,7 +147,7 @@ export default function Membres() {
               required
             />
             <input
-              className="form-input p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg flex-1 text-gray-900 dark:text-white"
+              className="form-input min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               type="email"
               placeholder="Adresse e-mail"
               value={email}
@@ -155,14 +155,14 @@ export default function Membres() {
               required
             />
             <select
-              className="form-input p-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
+              className="form-input min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               value={role}
               onChange={(e) => setRole(e.target.value)}
             >
               <option value="MEMBRE">Membre</option>
               <option value="SOUS_CHEF_DE_PROJET">Sous-chef de projet</option>
             </select>
-            <button type="submit" className="btn-add bg-teal-600 hover:bg-teal-700 text-white font-bold px-5 py-2.5 rounded-lg transition">
+            <button type="submit" className="btn-add rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700">
               Ajouter
             </button>
           </form>
