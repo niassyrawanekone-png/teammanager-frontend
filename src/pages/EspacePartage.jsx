@@ -49,6 +49,7 @@ function encodeVoiceWav(chunks, sampleRate) {
 
 function AttachmentMedia({ attachment }) {
   const [resource, setResource] = useState({ url: "", src: "", error: "" });
+  const [photoOpen, setPhotoOpen] = useState(false);
   useEffect(() => {
     let active = true;
     let objectUrl = "";
@@ -69,6 +70,14 @@ function AttachmentMedia({ attachment }) {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [attachment.url]);
+  useEffect(() => {
+    if (!photoOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setPhotoOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [photoOpen]);
   const isPrivateAttachment = attachment.url?.startsWith("/partage/attachments/");
   const displaySrc = isPrivateAttachment
     ? resource.url === attachment.url ? resource.src : ""
@@ -78,7 +87,18 @@ function AttachmentMedia({ attachment }) {
   if (attachment.content_type?.startsWith("audio/")) {
     return <div className="mt-2"><p className="mb-1 text-xs opacity-70">Message vocal</p><audio controls preload="metadata" src={displaySrc} className="max-w-full">Votre navigateur ne peut pas lire ce message vocal.</audio></div>;
   }
-  return <a href={displaySrc} target="_blank" rel="noreferrer" className="mt-2 block"><img src={displaySrc} alt={attachment.original_name} loading="lazy" className="max-h-72 rounded-lg object-contain" /></a>;
+  return <>
+    <button type="button" onClick={() => setPhotoOpen(true)} aria-label={`Afficher la photo ${attachment.original_name || ""}`} className="mt-2 block cursor-zoom-in text-left">
+      <img src={displaySrc} alt={attachment.original_name || "Photo jointe"} loading="lazy" className="max-h-72 rounded-lg object-contain" />
+    </button>
+    {photoOpen && <div role="dialog" aria-modal="true" aria-label="Aperçu de la photo" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button type="button" aria-label="Fermer l’aperçu de la photo" onClick={() => setPhotoOpen(false)} className="absolute inset-0 cursor-zoom-out bg-black/80" />
+      <div className="relative z-10 max-h-full max-w-full">
+        <button type="button" aria-label="Fermer l’aperçu de la photo" onClick={() => setPhotoOpen(false)} className="absolute -right-3 -top-3 grid h-9 w-9 place-items-center rounded-full bg-white text-xl font-bold text-black shadow-lg">×</button>
+        <img src={displaySrc} alt={attachment.original_name || "Photo jointe"} className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] rounded-lg object-contain shadow-2xl" />
+      </div>
+    </div>}
+  </>;
 }
 
 export default function EspacePartage() {
